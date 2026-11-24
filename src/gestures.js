@@ -45,8 +45,9 @@ export class HandMagic {
       this.video.srcObject=this.stream;await this.video.play();
       this.onStatus('loading','正在准备手势识别…');
       const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');
-      const fileset=await FilesetResolver.forVisionTasks('/vendor/wasm');
-      const options={baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.6,minHandPresenceConfidence:.6,minTrackingConfidence:.6};
+      const base=new URL(import.meta.env.BASE_URL,document.baseURI);
+      const fileset=await FilesetResolver.forVisionTasks(new URL('vendor/wasm',base).href);
+      const options={baseOptions:{modelAssetPath:new URL('models/hand_landmarker.task',base).href,delegate:'GPU'},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.6,minHandPresenceConfidence:.6,minTrackingConfidence:.6};
       let detector;
       try{detector=await HandLandmarker.createFromOptions(fileset,options);}catch{options.baseOptions.delegate='CPU';detector=await HandLandmarker.createFromOptions(fileset,options);}
       if(run!==this.generation){detector.close();return false;}

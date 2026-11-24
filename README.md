@@ -2,6 +2,12 @@
 
 一个可以用摄像头手势控制的三维粒子圣诞礼物。默认祝福是「小雨宝宝，我爱你」。
 
+线上礼物：https://chrisocling.github.io/starlit-christmas/
+
+源码仓库：https://github.com/chrisocling/starlit-christmas
+
+本项目通过 GitHub Pages 的 `gh-pages` 分支发布；`main` 分支保存源码。修改源码后运行 `npm run build`，再将 `dist/` 的完整内容更新到 `gh-pages` 分支即可重新发布。
+
 ## 本地运行
 
 需要 Node.js 20.19+ 或 22.12+。
