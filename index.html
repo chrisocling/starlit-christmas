@@ -1,89 +1,50 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#071911" />
-    <meta name="robots" content="noindex, nofollow" />
-    <meta name="description" content="小雨宝宝，圣诞快乐。我想把一整棵树的星光，都送给你。" />
-    <link rel="icon" type="image/svg+xml" href="./star.svg" />
-    <title>星光予你 · 给小雨宝宝的圣诞树</title>
-    <script type="module" crossorigin src="./assets/index-w9L3fyBZ.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BOf7boF2.css">
-  </head>
-  <body>
-    <div class="grain" aria-hidden="true"></div>
-    <div id="app">
-      <header class="site-header">
-        <a class="wordmark" href="./" aria-label="星光予你，首页"><span data-icon="sparkles"></span><span>星光予你<span class="wordmark-en">STARRY CHRISTMAS</span></span></a>
-        <div class="header-right">
-          <span class="edition">CHRISTMAS · 2026</span>
-          <button id="sound-toggle" class="icon-button" aria-label="开启圣诞音乐" aria-pressed="false" title="开启圣诞音乐"><span data-icon="sound-off"></span></button>
-          <button id="customize-button" class="subtle-button"><span data-icon="pen"></span><span>写给她</span></button>
-        </div>
-      </header>
-
-      <main class="experience">
-        <section class="introduction" aria-label="圣诞祝福">
-          <div class="eyebrow"><span></span>A LITTLE CHRISTMAS MAGIC</div>
-          <p class="dedication">To <span id="recipient">小雨宝宝</span> <span class="tiny-star">✧</span></p>
-          <h1>把星光，<br>都送给<span class="you">你<span class="you-underline"></span></span>。</h1>
-          <p class="intro-copy">有些浪漫，藏在一抬手之间。<br>伸出手，让这棵圣诞树为你闪耀。</p>
-          <button id="camera-toggle" class="primary-button"><span data-icon="hand"></span><span id="camera-label">开启手势魔法</span><span class="button-sparkle">✧</span></button>
-          <p id="camera-status" class="camera-status" role="status" aria-live="polite">允许使用摄像头，魔法就会发生</p>
-          <button id="letter-button" class="letter-link"><span data-icon="envelope"></span>还有几句话，想悄悄对你说<span class="letter-dot"></span></button>
-        </section>
-
-        <section id="scene-area" class="scene-area" aria-label="可交互的三维粒子圣诞树">
-          <canvas id="tree-canvas" aria-label="拖动旋转圣诞树，滚轮或双指缩放，双击点亮星光" tabindex="0"></canvas>
-          <div id="scene-loading" class="scene-loading"><span class="loading-star">✧</span><span>正在为你收集星光</span></div>
-          <div id="graphics-fallback" class="graphics-fallback" hidden><span>✧</span><p>这份星光，需要支持 WebGL 的浏览器。</p><p>试试用 Chrome 或 Safari 打开。</p><button id="fallback-letter" class="subtle-button">先读写给你的信</button></div>
-          <div class="christmas-date" aria-hidden="true"><span>December</span><strong>25</strong><small>A SEASON OF LOVE</small></div>
-          <div class="scene-caption"><span class="caption-line"></span><span id="scene-caption">每一颗星光，都在说爱你</span></div>
-          <div class="theme-picker" role="group" aria-label="星光色彩">
-            <span class="theme-label">星光色彩</span>
-            <button class="theme-swatch gold selected" data-theme="gold" aria-label="香槟鎏金" aria-pressed="true"><span></span><span class="swatch-name">鎏金</span></button>
-            <button class="theme-swatch rose" data-theme="rose" aria-label="玫瑰绯红" aria-pressed="false"><span></span><span class="swatch-name">绯红</span></button>
-            <button class="theme-swatch aurora" data-theme="aurora" aria-label="冰蓝极光" aria-pressed="false"><span></span><span class="swatch-name">极光</span></button>
-          </div>
-          <div id="love-reveal" class="love-reveal" aria-live="polite"><span id="love-recipient">小雨宝宝</span><strong id="love-message">我爱你</strong><small>YOU ARE MY FAVORITE CHRISTMAS GIFT.</small></div>
-        </section>
-
-        <div class="interaction-deck">
-          <div class="gesture-controls" role="group" aria-label="体验手势效果，也可直接点击">
-            <button class="gesture-button" data-mode="scatter" aria-pressed="false"><span class="gesture-icon" data-icon="hand"></span><span><strong>张开手</strong><small>星光散开</small></span><kbd>1</kbd></button>
-            <span class="deck-divider"></span>
-            <button class="gesture-button active" data-mode="tree" aria-pressed="true"><span class="gesture-icon" data-icon="fist"></span><span><strong>轻轻握拳</strong><small>聚成圣诞树</small></span><kbd>2</kbd></button>
-            <span class="deck-divider"></span>
-            <button class="gesture-button" data-mode="heart" aria-pressed="false"><span class="gesture-icon" data-icon="pinch"></span><span><strong>指尖捏合</strong><small>心动时刻</small></span><kbd>3</kbd></button>
-          </div>
-          <p class="interaction-hint"><span data-icon="mouse"></span>也可以直接点击 · 拖动旋转 · 滚轮缩放</p>
-        </div>
-
-        <aside id="camera-preview" class="camera-preview" hidden aria-label="摄像头预览">
-          <div class="camera-topline"><span class="live-dot"></span><span id="tracking-label">等待你的手掌</span><button id="close-camera" aria-label="关闭摄像头"><span data-icon="close"></span></button></div>
-          <div class="video-wrap"><video id="webcam" autoplay muted playsinline></video><canvas id="hand-overlay"></canvas></div>
-          <span class="privacy-note">画面仅在本机处理，不会上传</span>
-        </aside>
-      </main>
-
-      <footer class="site-footer"><span>A LITTLE GIFT, WITH A LOT OF LOVE.</span><span class="footer-wish">愿往后的每个圣诞，都有你在身边。<span>✧</span></span><button id="save-card"><span data-icon="download"></span>珍藏这一刻</button></footer>
-    </div>
-
-    <dialog id="letter-dialog" class="letter-dialog">
-      <button class="dialog-close icon-button" aria-label="关闭情书"><span data-icon="close"></span></button>
-      <div class="letter-paper"><span class="letter-eyebrow">A LETTER, JUST FOR YOU</span><span class="letter-star">✧</span><h2>亲爱的<span id="letter-recipient">小雨宝宝</span>：</h2><p id="letter-content"></p><div class="letter-signature"><span>圣诞快乐，我最喜欢的人。</span><strong id="letter-signature">永远爱你的我</strong></div><span class="letter-date">DECEMBER 25, 2026</span></div>
-    </dialog>
-
-    <dialog id="customize-dialog" class="customize-dialog">
-      <button class="dialog-close icon-button" aria-label="关闭编辑"><span data-icon="close"></span></button>
-      <span class="modal-eyebrow">MAKE IT YOURS</span><h2>把心意，写进星光里。</h2><p>给她的称呼、心动时的话，还有一封小小的信。</p>
-      <form id="customize-form"><label for="name-input">她的昵称</label><input id="name-input" name="name" maxlength="20" required autocomplete="off" />
-      <label for="message-input">星光想说的话</label><input id="message-input" name="message" maxlength="32" required autocomplete="off" />
-      <label for="letter-input">写给她的信</label><textarea id="letter-input" name="letter" rows="6" maxlength="1200" required></textarea>
-      <label for="signature-input">你的落款</label><input id="signature-input" name="signature" maxlength="24" required autocomplete="off" />
-      <button class="primary-button" type="submit"><span data-icon="sparkles"></span>藏进星光里</button><p class="local-note">修改会保存在这台设备上</p></form>
-    </dialog>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  </body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0c1523" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="description" content="给小雨宝宝的一棵圣诞树。用手势，拆开藏在星光里的回忆。" />
+<link rel="icon" type="image/svg+xml" href="./star.svg" />
+<title>给小雨宝宝的圣诞树</title>
+  <script type="module" crossorigin src="./assets/index-CwJCgzB_.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CTBKWmaj.css">
+</head>
+<body>
+<main id="scene" aria-label="雪地中的粒子圣诞树，拖动可以旋转，双击或按空格打开一张照片">
+<h1 class="sr-only">小雨宝宝，我爱你。藏在圣诞树里的回忆。</h1>
+<canvas id="tree-canvas" tabindex="0" aria-label="互动圣诞树。点树顶星星管理照片与摄像头，双击或按空格打开一张照片，左右方向键翻照片。"></canvas>
+<button id="star-control" aria-label="点亮树顶星星，打开照片与手势设置" title="照片与手势设置"></button>
+<div id="loading" aria-label="正在点亮圣诞树"><span>✦</span></div>
+<div id="graphics-fallback" hidden><span>✦</span><p>这棵树需要支持 WebGL 的浏览器。</p><p>试试通过 Chrome 或 Safari 打开。</p></div>
+<video id="webcam" autoplay muted playsinline class="inference-video" aria-hidden="true"></video>
+<canvas id="hand-overlay" hidden></canvas>
+</main>
+<dialog id="settings" aria-labelledby="settings-title">
+<button id="close-settings" class="close-button" aria-label="回到圣诞树">×</button>
+<span class="settings-star" aria-hidden="true">✦</span><h2 id="settings-title">把回忆，挂上树。</h2>
+<p class="settings-intro">每做一次手势，就从星光里拆开一张照片。</p>
+<section class="settings-section" aria-label="照片">
+<div class="section-label"><span>我们的照片</span><span id="photo-count">还没有放入照片</span></div>
+<div id="photo-grid" class="photo-grid"></div>
+<div id="empty-album" class="empty-album"><span>♡</span><p>把想一起回看的瞬间，放进这棵树里。</p></div>
+<div class="photo-actions"><button id="import-photos" class="primary">批量放入照片</button><button id="try-photo" class="secondary" disabled>放出一张</button></div>
+<p id="album-status" class="fine-print" role="status">自己导入的照片保存在当前浏览器，不会上传。</p>
+</section>
+<section class="settings-section" aria-label="摄像头手势">
+<div class="setting-row"><div><span>摄像头手势</span><small id="camera-status">张开手、握拳、捏合，都能放出照片</small></div><button id="camera-toggle" class="switch" role="switch" aria-checked="false" aria-label="开启摄像头手势"><span></span></button></div>
+<p class="fine-print">手势稳定后显示一张，放下手再做可换下一张。画面仅在本机处理。</p>
+<details class="camera-details"><summary>查看镜头状态</summary><div class="camera-monitor"><canvas id="camera-monitor"></canvas><span id="tracking-status">摄像头未开启</span></div></details>
+</section>
+<section class="settings-section compact" aria-label="场景选项">
+<div class="setting-row"><span>圣诞音乐</span><button id="music-toggle" class="switch" role="switch" aria-checked="false" aria-label="开启圣诞音乐"><span></span></button></div>
+<div class="setting-row"><span>沉浸全屏</span><button id="fullscreen-toggle" class="text-button">进入全屏</button></div>
+</section>
+<details class="help"><summary>还有这些小魔法</summary><p>拖动旋转，滚轮或双指缩放。双击、按空格或左右方向键翻照片。点击照片或按 Esc 收起照片。按 P 导入照片、G 开关摄像头、M 开关音乐。右键或长按空白处，也能打开这里。</p></details>
+<p class="album-admin"><button id="clear-photos" class="text-button" disabled>移除本机导入的照片</button></p>
+</dialog>
+<input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif" multiple hidden />
+<div id="toast" role="status" aria-live="polite"></div>
+</body>
 </html>
