@@ -21,14 +21,16 @@ export function classifyGesture(landmarks){
 }
 
 export class GestureStabilizer {
-  constructor({hold=280,cooldown=700}={}){this.hold=hold;this.cooldown=cooldown;this.candidate=null;this.since=0;this.last=null;this.changed=-Infinity;}
+  constructor({hold=280,cooldown=1200,release=450}={}){this.hold=hold;this.cooldown=cooldown;this.release=release;this.candidate=null;this.since=0;this.last=null;this.changed=-Infinity;this.absentSince=null;}
   update(gesture,time){
-    if(!gesture){this.candidate=null;return null;}
+    if(!gesture){this.candidate=null;if(this.absentSince===null)this.absentSince=time;if(time-this.absentSince>=this.release)this.last=null;return null;}
+    if(this.absentSince!==null&&time-this.absentSince>=this.release)this.last=null;
+    this.absentSince=null;
     if(this.candidate!==gesture){this.candidate=gesture;this.since=time;return null;}
     if(time-this.since>=this.hold&&time-this.changed>=this.cooldown&&gesture!==this.last){this.last=gesture;this.changed=time;return gesture;}
     return null;
   }
-  reset(){this.candidate=null;this.last=null;this.changed=-Infinity;}
+  reset(){this.candidate=null;this.last=null;this.changed=-Infinity;this.absentSince=null;}
 }
 
 export class HandMagic {
@@ -62,7 +64,7 @@ export class HandMagic {
   loop(time){
     if(!this.active)return;
     this.frame=requestAnimationFrame(this.loop);
-    if(document.hidden||time-this.lastDetection<80||this.video.readyState<2||this.video.currentTime===this.lastTime)return;
+    if(document.hidden||this.paused||time-this.lastDetection<80||this.video.readyState<2||this.video.currentTime===this.lastTime)return;
     this.lastDetection=time;this.lastTime=this.video.currentTime;
     try{
       const result=this.detector.detectForVideo(this.video,time);
@@ -72,7 +74,7 @@ export class HandMagic {
       const recognized=classifyGesture(result.worldLandmarks?.[0]||landmarks);
       const mode=this.stabilizer.update(recognized,time);
       if(mode)this.onMode(mode);
-      const names={scatter:'张开手 · 星光散开',tree:'轻轻握拳 · 聚成圣诞树',heart:'指尖捏合 · 心动时刻'};
+      const names={scatter:'张开手 · 打开一张照片',tree:'握拳 · 打开一张照片',heart:'捏合 · 打开一张照片'};
       this.onStatus('tracking',names[recognized]||'已找到你的手 · 试试张开手掌');
       const cx=(landmarks[0].x+landmarks[5].x+landmarks[17].x)/3;
       this.onRotation((.5-cx)*2);

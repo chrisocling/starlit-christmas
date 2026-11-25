@@ -29,7 +29,7 @@ test('ignores absent, incomplete, nonfinite, and degenerate landmarks',()=>{
 test('requires a sustained gesture and only emits each change once',()=>{
   const s=new GestureStabilizer();
   assert.equal(s.update('heart',0),null);assert.equal(s.update('heart',200),null);assert.equal(s.update('heart',300),'heart');assert.equal(s.update('heart',1000),null);
-  assert.equal(s.update('tree',1100),null);assert.equal(s.update('tree',1400),'tree');
+  assert.equal(s.update('tree',1100),null);assert.equal(s.update('tree',1600),'tree');
 });
 test('brief tracking loss and changing candidates reset the hold period',()=>{
   const s=new GestureStabilizer();
@@ -38,4 +38,12 @@ test('brief tracking loss and changing candidates reset the hold period',()=>{
 test('cooldown prevents flicker and reset allows the same gesture to trigger again',()=>{
   const s=new GestureStabilizer({hold:100,cooldown:800});
   s.update('heart',0);assert.equal(s.update('heart',101),'heart');s.update('tree',110);assert.equal(s.update('tree',250),null);assert.equal(s.update('tree',950),'tree');s.reset();s.update('tree',1000);assert.equal(s.update('tree',1101),'tree');
+});
+test('holding a gesture emits once, lowering the hand rearms the same gesture',()=>{
+  const s=new GestureStabilizer();s.update('scatter',0);assert.equal(s.update('scatter',300),'scatter');
+  for(const time of [600,1000,1500,2000])assert.equal(s.update('scatter',time),null);
+  s.update(null,2100);s.update(null,2600);s.update('scatter',2700);assert.equal(s.update('scatter',3000),'scatter');
+});
+test('a short loss of tracking does not pop another photo',()=>{
+  const s=new GestureStabilizer();s.update('heart',0);s.update('heart',300);s.update(null,2000);s.update('heart',2080);assert.equal(s.update('heart',2400),null);
 });
