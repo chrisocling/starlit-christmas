@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#0c1523" />
+<meta name="theme-color" content="#0d0a1c" />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="description" content="给小雨宝宝的一棵圣诞树。用手势，拆开藏在星光里的回忆。" />
 <link rel="icon" type="image/svg+xml" href="/star.svg" />
@@ -15,6 +15,7 @@
 <canvas id="tree-canvas" tabindex="0" aria-label="互动圣诞树。点树顶星星管理照片与摄像头，双击或按空格打开一张照片，左右方向键翻照片。"></canvas>
 <button id="star-control" aria-label="点亮树顶星星，打开照片与手势设置" title="照片与手势设置"></button>
 <div id="loading" aria-label="正在点亮圣诞树"><span>✦</span></div>
+<div id="merry" aria-hidden="true"><span class="merry-script">Merry Christmas</span><span class="merry-sub">FOR 小雨宝宝</span></div>
 <div id="graphics-fallback" hidden><span>✦</span><p>这棵树需要支持 WebGL 的浏览器。</p><p>试试通过 Chrome 或 Safari 打开。</p></div>
 <video id="webcam" autoplay muted playsinline class="inference-video" aria-hidden="true"></video>
 <canvas id="hand-overlay" hidden></canvas>
