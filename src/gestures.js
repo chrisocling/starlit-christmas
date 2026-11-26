@@ -10,12 +10,12 @@ export function classifyGesture(landmarks){
   let extended=0;
   for(const mcp of [5,9,13,17]){
     const pip=mcp+1,tip=mcp+3;
-    if(distance(landmarks[tip],landmarks[0])>distance(landmarks[pip],landmarks[0])*1.13&&jointAngle(landmarks[mcp],landmarks[pip],landmarks[tip])>2.55)extended++;
+    if(distance(landmarks[tip],landmarks[0])>distance(landmarks[pip],landmarks[0])*1.08&&jointAngle(landmarks[mcp],landmarks[pip],landmarks[tip])>2.3)extended++;
   }
   const reach=distance(landmarks[8],landmarks[0])/Math.max(distance(landmarks[6],landmarks[0]),.0001);
   const pinch=distance(landmarks[4],landmarks[8])/palm;
-  if(pinch<.4&&(extended>0||reach>1.05))return 'heart';
-  if(extended===4)return 'scatter';
+  if(pinch<.5&&(extended>0||reach>1.05))return 'heart';
+  if(extended>=3)return 'scatter';
   if(extended===0||extended<=1&&reach<.95)return 'tree';
   return null;
 }
@@ -36,7 +36,7 @@ export class GestureStabilizer {
 export class HandMagic {
   constructor({video,overlay,onMode,onRotation,onStatus,onError}){
     Object.assign(this,{video,overlay,onMode,onRotation,onStatus,onError});
-    this.stabilizer=new GestureStabilizer();this.active=false;this.generation=0;
+    this.stabilizer=new GestureStabilizer({hold:200,cooldown:1000});this.active=false;this.generation=0;
   }
   async start(){
     const run=++this.generation;
