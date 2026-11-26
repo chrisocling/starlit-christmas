@@ -103,7 +103,7 @@ export class ChristmasTree {
   }
 
   buildParticles() {
-    const count = this.mobile ? 130000 : 240000;
+    const count = this.mobile ? 150000 : 290000;
     const pos = new Float32Array(count * 3), sizes = new Float32Array(count), kinds = new Float32Array(count), seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const kind = rand(); let x, y, z;
@@ -111,15 +111,16 @@ export class ChristmasTree {
         y = rand(.22, 8.65); const angle = rand(0, TAU), r = radiusAt(y) * Math.pow(rand(), .7);
         x = Math.cos(angle) * r; z = Math.sin(angle) * r;
       } else {
-        // Cone volume with soft edge: radial offset spread around the shell so the
-        // silhouette reads as haze instead of a crisp triangle.
-        y = .3 + Math.pow(rand(), .92) * 8.4;
-        const shell = radiusAt(y);
-        const gauss = (rand() + rand() + rand() + rand() - 2) / 2;
-        const r = Math.max(.02, shell * (1 + gauss * .38));
+        // Dense cone but with a rippling, irregular silhouette: the radius swells
+        // and narrows with angle and height, and particles haze around the surface.
+        y = .3 + Math.pow(rand(), .9) * 8.45;
         const angle = rand(0, TAU);
+        const ripple = 1 + .13 * Math.sin(angle * 3 + y * 1.4) + .09 * Math.sin(angle * 7 - y * 2.2) + .07 * Math.sin(y * 4.6 + 1.3);
+        const shell = Math.max(.05, radiusAt(y) * ripple);
+        const gauss = (rand() + rand() + rand() + rand() - 2) / 2;
+        const r = Math.max(.02, shell * (1 + gauss * .3));
         x = Math.cos(angle) * r + rand(-.05, .05); z = Math.sin(angle) * r + rand(-.05, .05);
-        y += rand(-.12, .12);
+        y += rand(-.1, .1);
         if (kind >= .70 && kind < .86) y += .065;
       }
       pos.set([x, y, z], i * 3);
@@ -143,7 +144,7 @@ export class ChristmasTree {
         vec4 mv=modelViewMatrix*vec4(p,1.);
         vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.45/-mv.z*(1.+uBurst*.8+vFlow*.3),1.,10.)*(.4+.6*vVis);gl_Position=projectionMatrix*mv;}`,
       fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle,vFlow,vVis;
-        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float alpha=exp(-d*d*20.)*(vKind<.70?.75:.34)*vVis;vec3 c;
+        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float alpha=exp(-d*d*20.)*(vKind<.70?.95:.4)*vVis;vec3 c;
         float t=vKind/.70;
         if(vKind<.70)c=mix(vec3(.34,.15,.58),vec3(.68,.25,.48),t)*(.8+t*.45);else if(vKind<.86)c=vec3(.78,.72,1.)*.8;else if(vKind<.985)c=vec3(1.,.5,.85)*(2.2+vTwinkle*1.3);else c=vec3(1.,.85,.95)*2.6;
         if(vKind>.99){float cross=pow(max(0.,1.-abs(p.x)*24.),5.)+pow(max(0.,1.-abs(p.y)*24.),5.);alpha+=cross*.25;}
