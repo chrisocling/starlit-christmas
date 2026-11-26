@@ -14,7 +14,7 @@ const TAU = Math.PI * 2;
 let seed = 76391;
 const rand = (lo = 0, hi = 1) => { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; return lo + (seed >>> 0) / 4294967296 * (hi - lo); };
 // A soft canopy envelope; individual branches are clouds, never surfaces.
-function radiusAt(y) { return Math.max(.035, 1.8 * Math.pow(THREE.MathUtils.clamp(1 - (y - .35) / 8.45, 0, 1), 1.02)); }
+function radiusAt(y) { return Math.max(.035, 2.6 * Math.pow(THREE.MathUtils.clamp(1 - (y - .35) / 8.45, 0, 1), 1.02)); }
 function strip(curve, width, segments = 44) {
   const positions = [], uv = [], indices = [];
   for (let i = 0; i <= segments; i++) { const t = i / segments, p = curve.getPoint(t), tangent = curve.getTangent(t); const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 0, 1)).normalize().multiplyScalar(width / 2); for (const sign of [-1, 1]) { positions.push(p.x + side.x * sign, p.y + side.y * sign, p.z + side.z * sign); uv.push((sign + 1) / 2, t); } if (i < segments) { const a = i * 2; indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
@@ -231,7 +231,12 @@ export class ChristmasTree {
         vFade=pow(1.-ph,1.6)*step(.004,ph);vHue=h3;vTwinkle=.6+.4*sin(uTime*7.+aSeed*9.);
         vec4 mv=modelViewMatrix*vec4(p,1.);gl_PointSize=clamp(aSize*uPixel*uHeight*2.1/-mv.z,1.,16.)*(.35+.65*vFade);gl_Position=projectionMatrix*mv;}`,
       fragmentShader: `uniform float uGo;varying float vFade,vHue,vTwinkle;void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;
-        vec3 c=mix(vec3(1.,.62,.88),mix(vec3(1.,.86,.55),vec3(.72,.52,1.),step(.55,vHue)),step(.34,vHue));
+        vec3 c=vec3(1.,.86,.5);
+        c=mix(c,vec3(1.,.55,.85),step(.17,vHue));
+        c=mix(c,vec3(.72,.55,1.),step(.34,vHue));
+        c=mix(c,vec3(.55,.9,1.),step(.5,vHue));
+        c=mix(c,vec3(.6,1.,.72),step(.66,vHue));
+        c=mix(c,vec3(1.,.5,.4),step(.83,vHue));
         float a=exp(-d*d*9.)*vFade*(.65+vTwinkle*.35)*uGo;if(a<.004)discard;
         gl_FragColor=vec4(c*(3.2+vTwinkle*2.),a);}`,
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,

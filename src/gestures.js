@@ -45,13 +45,25 @@ export class HandMagic {
       this.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:480},height:{ideal:360},frameRate:{ideal:20,max:24}}});
       if(run!==this.generation){this.stream.getTracks().forEach(t=>t.stop());return false;}
       this.video.srcObject=this.stream;await this.video.play();
-      this.onStatus('loading','正在准备手势识别…');
-      const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');
       const base=new URL(import.meta.env.BASE_URL,document.baseURI);
-      const fileset=await FilesetResolver.forVisionTasks(new URL('vendor/wasm',base).href);
-      const options={baseOptions:{modelAssetPath:new URL('models/hand_landmarker.task',base).href,delegate:'GPU'},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.6,minHandPresenceConfidence:.6,minTrackingConfidence:.6};
+      const modelUrl=new URL('models/hand_landmarker.task',base).href;
+      this.onStatus('loading','正在下载手势模型…');
+      let model;
+      try{
+        const res=await fetch(modelUrl);
+        if(!res.ok)throw new Error('模型下载失败');
+        const total=Number(res.headers.get('content-length'))||0,reader=res.body.getReader(),chunks=[];let got=0;
+        for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);got+=value.length;if(total)this.onStatus('loading','正在下载手势模型… '+Math.min(99,Math.round(got/total*100))+'%');}
+        model=new Uint8Array(got);let off=0;for(const c of chunks){model.set(c,off);off+=c.length;}
+      }catch(error){this.stop();throw new Error('手势模型下载失败，请检查网络后重试');}
+      if(run!==this.generation)return false;
+      this.onStatus('loading','正在准备手势识别…');
+      const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);
+      const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');
+      const fileset=await withTimeout(FilesetResolver.forVisionTasks(new URL('vendor/wasm',base).href),25000,'手势识别加载超时，请重试');
+      const options={baseOptions:{modelAssetBuffer:model,delegate:'GPU'},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.6,minHandPresenceConfidence:.6,minTrackingConfidence:.6};
       let detector;
-      try{detector=await HandLandmarker.createFromOptions(fileset,options);}catch{options.baseOptions.delegate='CPU';detector=await HandLandmarker.createFromOptions(fileset,options);}
+      try{detector=await withTimeout(HandLandmarker.createFromOptions(fileset,options),30000,'手势识别启动超时，请重试');}catch{options.baseOptions.delegate='CPU';detector=await withTimeout(HandLandmarker.createFromOptions(fileset,options),30000,'手势识别启动超时，请重试');}
       if(run!==this.generation){detector.close();return false;}
       this.detector=detector;this.active=true;this.lastTime=-1;this.lastDetection=0;this.noHandSince=0;
       this.connections=HandLandmarker.HAND_CONNECTIONS;
