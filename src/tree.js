@@ -8,6 +8,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { animate } from 'animejs';
+import { createGiftLayout } from './gift-layout.js';
 
 const TAU = Math.PI * 2;
 let seed = 76391;
@@ -44,8 +45,8 @@ export class ChristmasTree {
       const rim = new THREE.DirectionalLight('#8cadf3', .75); rim.position.set(5, 7, -5); this.scene.add(rim);
       const warm = new THREE.PointLight('#ffb955', 6, 12, 2); warm.position.set(0, 3.5, 3); this.scene.add(warm);
       this.root = new THREE.Group(); this.scene.add(this.root); this.treeParticles = new THREE.Group(); this.treeParticles.name = 'ChristmasTreeParticles'; this.root.add(this.treeParticles); this.photoOrnaments = new THREE.Group(); this.root.add(this.photoOrnaments);
-      this.buildSnowfield(); this.buildParticles(); this.buildGarlands(); this.buildStar(); this.buildGifts(); this.buildWeather();
-      this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera)); this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 1.03, .55, 1.65); this.composer.addPass(this.bloom); this.composer.addPass(new OutputPass());
+      this.buildSnowfield(); this.buildParticles(); this.buildGarlands(); this.buildStar(); this.buildLightTrails(); this.buildGifts(); this.buildWeather(); this.buildSpaceDecorations();
+      this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera)); this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .82, .6, 2.3); this.composer.addPass(this.bloom); this.composer.addPass(new OutputPass());
       this.resizeObserver = new ResizeObserver(() => this.resize()); this.resizeObserver.observe(canvas.parentElement); this.resize();
       this.bindInput(); this.visibilityHandler = () => { this.lastTime = 0; }; document.addEventListener('visibilitychange', this.visibilityHandler);
       canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); this.lost = true; callbacks.onError?.(); });
@@ -68,7 +69,7 @@ export class ChristmasTree {
   }
 
   buildParticles() {
-    const count = this.mobile ? 48000 : 98000;
+    const count = this.mobile ? 64000 : 132000;
     const pos = new Float32Array(count * 3), sizes = new Float32Array(count), kinds = new Float32Array(count), seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const kind = rand(); let x, y, z;
@@ -88,22 +89,23 @@ export class ChristmasTree {
         if (kind >= .70 && kind < .86) y += .065;
       }
       pos.set([x, y, z], i * 3);
-      sizes[i] = kind >= .86 ? rand(.015, .047) : rand(.011, .030);
+      sizes[i] = kind >= .86 ? rand(.030, .085) : rand(.023, .052);
       kinds[i] = kind; seeds[i] = rand(0, TAU);
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1)); geo.setAttribute('aKind', new THREE.BufferAttribute(kinds, 1)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
     this.particleMaterial = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uBurst: { value: 0 }, uFocus: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
-      vertexShader: `attribute float aSize,aKind,aSeed; uniform float uTime,uIntro,uBurst,uPixel,uHeight; varying float vKind,vTwinkle;
+      vertexShader: `attribute float aSize,aKind,aSeed; uniform float uTime,uIntro,uBurst,uPixel,uHeight; varying float vKind,vTwinkle,vFlow;
         void main(){vec3 p=position; vec3 center=vec3(0.,4.2,0.); vec3 outDir=normalize(p-center+vec3(.01));
-        p+=outDir*uBurst*(.5+aSeed*.23); p+=vec3(sin(uTime*.7+aSeed),cos(uTime*.8+aSeed),sin(uTime*.5+aSeed*2.))*.022;
+        p+=outDir*uBurst*(.7+aSeed*.29); p+=vec3(sin(uTime*.7+aSeed),cos(uTime*.8+aSeed),sin(uTime*.5+aSeed*2.))*.062;
+        p.x+=sin(p.y*.7+uTime*.55)*.085;p.z+=cos(p.y*.6+uTime*.4)*.07;
         vec3 initial=outDir*(5.+aSeed*.5)+center; p=mix(initial,p,uIntro);vec4 mv=modelViewMatrix*vec4(p,1.);
-        vKind=aKind;vTwinkle=.64+.36*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.2/-mv.z*(1.+uBurst),.8,32.);gl_Position=projectionMatrix*mv;}`,
-      fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle;
-        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float alpha=exp(-d*d*25.);vec3 c;
-        if(vKind<.70)c=vec3(.018,.20,.085)*(1.+vKind);else if(vKind<.86)c=vec3(.42,.61,.68)*.72;else if(vKind<.985)c=vec3(1.,.55,.15)*(2.8+vTwinkle*1.6);else c=vec3(1.,.035,.065)*2.4;
-        if(vKind>.99){float cross=pow(max(0.,1.-abs(p.x)*24.),5.)+pow(max(0.,1.-abs(p.y)*24.),5.);alpha+=cross*.2;}
-        gl_FragColor=vec4(c*vTwinkle*(1.-uFocus*.35),alpha*uIntro*.9);}`,
+        vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.45/-mv.z*(1.+uBurst*.8+vFlow*.3),1.,42.);gl_Position=projectionMatrix*mv;}`,
+      fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle,vFlow;
+        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float alpha=exp(-d*d*10.)*(vKind<.70?.8:.55);vec3 c;
+        if(vKind<.70)c=vec3(.012,.44,.15)*(1.3+vKind*.9);else if(vKind<.86)c=vec3(.52,.70,.92)*1.0;else if(vKind<.985)c=vec3(1.,.53,.13)*(2.6+vTwinkle*1.5);else c=vec3(1.,.04,.09)*3.;
+        if(vKind>.99){float cross=pow(max(0.,1.-abs(p.x)*24.),5.)+pow(max(0.,1.-abs(p.y)*24.),5.);alpha+=cross*.25;}
+        gl_FragColor=vec4(c*vTwinkle*(1.+vFlow*.5)*(1.-uFocus*.3),alpha*uIntro);}`,
       // Alpha blending keeps the colored light points visible over the white snow.
       transparent: true, blending: THREE.NormalBlending, depthWrite: false,
     });
@@ -118,8 +120,8 @@ export class ChristmasTree {
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('aAlong', new THREE.Float32BufferAttribute(along, 1));
     this.garlandMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uHeight: { value: innerHeight }, uPixel: { value: this.renderer.getPixelRatio() } },
-      vertexShader: `attribute float aAlong;uniform float uTime,uHeight,uPixel;varying float vLight;void main(){vLight=pow(max(0.,sin(aAlong*62.-uTime*2.2)),12.);vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp((.016+vLight*.025)*uPixel*uHeight/-p.z,.8,20.);gl_Position=projectionMatrix*p;}`,
-      fragmentShader: `uniform float uIntro;varying float vLight;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vec3(1.,.53,.15)*(2.7+vLight*1.9),exp(-d*d*24.)*(.6+vLight*.4)*uIntro);}`,
+      vertexShader: `attribute float aAlong;uniform float uTime,uHeight,uPixel;varying float vLight;void main(){vLight=pow(max(0.,sin(aAlong*62.-uTime*2.2)),12.);vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp((.027+vLight*.043)*uPixel*uHeight/-p.z,.8,20.);gl_Position=projectionMatrix*p;}`,
+      fragmentShader: `uniform float uIntro;varying float vLight;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vec3(1.,.53,.15)*(2.6+vLight*1.8),exp(-d*d*14.)*(.7+vLight*.3)*uIntro);}`,
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const garland = new THREE.Points(geo, this.garlandMaterial); garland.name = 'Garland light particles'; this.treeParticles.add(garland);
@@ -131,16 +133,68 @@ export class ChristmasTree {
     const count = this.mobile ? 760 : 1400, positions = [], seeds = [], sizes = [];
     for (let i = 0; i < count; i++) {
       const edge = Math.floor(rand(0, 10)), a = vertices[edge], b = vertices[(edge + 1) % 10], along = rand(), radius = i % 4 === 0 ? 1 : Math.sqrt(rand());
-      positions.push((a.x * (1 - along) + b.x * along) * radius + rand(-.003, .003), (a.y * (1 - along) + b.y * along) * radius + rand(-.003, .003), rand(-.035, .035)); seeds.push(rand(0, TAU)); sizes.push(rand(.006, .018));
+      positions.push((a.x * (1 - along) + b.x * along) * radius + rand(-.003, .003), (a.y * (1 - along) + b.y * along) * radius + rand(-.003, .003), rand(-.035, .035)); seeds.push(rand(0, TAU)); sizes.push(rand(.010, .026));
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1)); geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
     this.starMaterial = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
-      vertexShader: `attribute float aSeed,aSize;uniform float uTime,uHeight,uPixel;varying float vTwinkle;void main(){vec3 p=position;p.xy+=vec2(sin(uTime+aSeed),cos(uTime*.8+aSeed))*.003;vTwinkle=.65+.35*sin(uTime*1.6+aSeed*3.);vec4 mv=modelViewMatrix*vec4(p,1.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.2/-mv.z,.75,5.);gl_Position=projectionMatrix*mv;}`,
+      vertexShader: `attribute float aSeed,aSize;uniform float uTime,uHeight,uPixel;varying float vTwinkle;void main(){vec3 p=position;p.xy+=vec2(sin(uTime+aSeed),cos(uTime*.8+aSeed))*.003;vTwinkle=.65+.35*sin(uTime*1.6+aSeed*3.);vec4 mv=modelViewMatrix*vec4(p,1.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.4/-mv.z,1.,8.);gl_Position=projectionMatrix*mv;}`,
       fragmentShader: `uniform float uIntro;varying float vTwinkle;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vec3(1.,.7,.28)*(3.5+vTwinkle*1.8),exp(-d*d*25.)*uIntro);}`,
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     });
     this.starGroup.add(new THREE.Points(geo, this.starMaterial)); this.treeParticles.add(this.starGroup);
+  }
+
+  buildLightTrails() {
+    const positions = [], orbits = [], tails = [];
+    for (let i = 0; i < (this.mobile ? 7 : 12); i++) for (let j = 0; j < 160; j++) { positions.push(0, 0, 0); orbits.push(i); tails.push(j / 159); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('aOrbit', new THREE.Float32BufferAttribute(orbits, 1)); geo.setAttribute('aTail', new THREE.Float32BufferAttribute(tails, 1));
+    this.trailMaterial = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uBurst: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
+      vertexShader: `attribute float aOrbit,aTail;uniform float uTime,uHeight,uPixel,uBurst;varying float vGlow,vHue;
+        void main(){float phase=uTime*(.20+aOrbit*.007)+aOrbit*2.39996-aTail*.62;float y=.7+fract(aOrbit*.618)*7.9+sin(phase*.65+aOrbit)*.23;float r=3.15*pow(max(.03,1.-y/9.3),.9)+.75+sin(aOrbit)*.16+uBurst*.6;
+        vec3 p=vec3(cos(phase)*r,y,sin(phase)*r);vec4 mv=modelViewMatrix*vec4(p,1.);vGlow=pow(1.-aTail,1.8);vHue=fract(aOrbit*.39);gl_PointSize=clamp((.018+pow(vGlow,5.)*.075)*uPixel*uHeight/-mv.z,1.,16.);gl_Position=projectionMatrix*mv;}`,
+      fragmentShader: `uniform float uIntro;varying float vGlow,vHue;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;vec3 c=mix(vec3(1.,.57,.12),vec3(.32,.72,1.),step(.6,vHue)*.6);gl_FragColor=vec4(c*(3.+vGlow*3.),exp(-d*d*12.)*(.08+vGlow*.9)*uIntro);}`,
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const trails = new THREE.Points(geo, this.trailMaterial); trails.name = 'Orbiting light trails'; trails.frustumCulled = false; this.treeParticles.add(trails);
+  }
+
+  buildSpaceDecorations() {
+    const pos = [], centers = [], scales = [], phases = [], kinds = [], sizes = [];
+    const count = this.mobile ? 28 : 44;
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, TAU), r = this.mobile ? rand(3.25, 4.35) : rand(6.2, 8.6);
+      const center = [Math.cos(a) * r, 1.5 + rand(0, 9.3), Math.sin(a) * r];
+      const scale = this.mobile ? rand(.17, .30) : rand(.20, .42) * (r / 8.6) * 1.15, phase = rand(0, TAU), type = i % 3;
+      const dot = (x, y, kind = type) => { pos.push(x, y, rand(-.008, .008)); centers.push(...center); scales.push(scale); phases.push(phase); kinds.push(kind); sizes.push(rand(.014, .028)); };
+      const line = (x1, y1, x2, y2, n = 20, kind = type) => { for (let j = 0; j <= n; j++) { const t = j / n; dot(x1 * (1 - t) + x2 * t, y1 * (1 - t) + y2 * t, kind); } };
+      if (type === 0) {
+        for (let arm = 0; arm < 6; arm++) {
+          const a = arm / 6 * TAU; line(0, 0, Math.cos(a), Math.sin(a), 25);
+          for (const r of [.42, .70]) for (const sign of [-1, 1]) { const b = a + sign * Math.PI / 3, x = Math.cos(a) * r, y = Math.sin(a) * r; line(x, y, x - Math.cos(b) * .27, y - Math.sin(b) * .27, 9); }
+        }
+      } else if (type === 1) {
+        const vertices = Array.from({ length: 10 }, (_, k) => { const a = Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? .43 : 1; return [Math.cos(a) * r, Math.sin(a) * r]; });
+        for (let k = 0; k < 10; k++) line(...vertices[k], ...vertices[(k + 1) % 10], 22);
+        for (let k = 0; k < 30; k++) { const a = rand(0, TAU), r = rand(0, .4); dot(Math.cos(a) * r, Math.sin(a) * r); }
+      } else {
+        for (let k = 0; k < 180; k++) { const a = k / 180 * TAU; dot(Math.cos(a) * .72, Math.sin(a) * .72); }
+        line(-.17, .70, .17, .70, 10, 1); line(-.17, .70, -.13, .91, 10, 1); line(.17, .70, .13, .91, 10, 1); line(-.13, .91, .13, .91, 10, 1);
+        for (let k = 0; k < 40; k++) { const a = k / 40 * TAU; dot(Math.cos(a) * .1, .99 + Math.sin(a) * .1, 1); }
+        for (let k = 0; k < 30; k++) { const a = rand(0, TAU), r = rand(0, .62); dot(Math.cos(a) * r, Math.sin(a) * r); }
+      }
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aCenter', new THREE.Float32BufferAttribute(centers, 3)); geo.setAttribute('aScale', new THREE.Float32BufferAttribute(scales, 1)); geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1)); geo.setAttribute('aKind', new THREE.Float32BufferAttribute(kinds, 1)); geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+    this.decorMaterial = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
+      vertexShader: `attribute vec3 aCenter;attribute float aScale,aPhase,aKind,aSize;uniform float uTime,uHeight,uPixel;varying float vLight,vKind;
+        void main(){vec3 center=aCenter;center.y+=sin(uTime*.32+aPhase)*.18;center.x+=cos(uTime*.2+aPhase)*.10;float a=sin(uTime*.13+aPhase)*.17+aPhase*.12;mat2 rot=mat2(cos(a),-sin(a),sin(a),cos(a));vec2 local=rot*position.xy*aScale;
+        vec4 mv=modelViewMatrix*vec4(center,1.);mv.xy+=local;mv.z+=position.z;vLight=.72+.28*sin(uTime*.9+aPhase+position.x*.5);vKind=aKind;gl_PointSize=clamp(aSize*uPixel*uHeight/-mv.z,1.,5.);gl_Position=projectionMatrix*mv;}`,
+      fragmentShader: `uniform float uIntro;varying float vLight,vKind;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;vec3 c=vKind<.5?vec3(.13,.42,.78)*2.:vKind<1.5?vec3(1.,.61,.17)*3.5:vec3(.85,.025,.10)*2.5;gl_FragColor=vec4(c*vLight,exp(-d*d*12.)*.88*uIntro);}`,
+      transparent: true, blending: THREE.NormalBlending, depthWrite: false,
+    });
+    const decorations = new THREE.Points(geo, this.decorMaterial); decorations.name = 'Space particle decorations'; decorations.frustumCulled = false; this.scene.add(decorations);
   }
 
   buildGifts() {
@@ -158,11 +212,11 @@ export class ChristmasTree {
       return new THREE.MeshStandardMaterial({ map: texture, roughness: .52, metalness: .08 });
     });
     const ribbons = ['#d9b86d', '#ece5d4', '#aa193a'].map((color, i) => new THREE.MeshStandardMaterial({ color, metalness: i === 1 ? .15 : .58, roughness: .3, side: THREE.DoubleSide }));
-    const gifts = new THREE.Group(); gifts.name = 'Gifts around the tree'; this.scene.add(gifts); this.giftCount = this.mobile ? 18 : 24; this.sceneWidth = this.mobile ? 7.8 : 9.2;
+    const gifts = new THREE.Group(); gifts.name = 'Gifts around the tree'; this.scene.add(gifts); const layout = createGiftLayout({ mobile: this.mobile }); gifts.userData.layout = layout; this.giftCount = layout.length; this.sceneWidth = this.mobile ? 9.6 : 10.2;
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
-    const place = (x, z, w, h, d, index, elevation = 0) => {
-      const g = new THREE.Group(); g.position.set(x, h / 2 - .025 + elevation, z); g.rotation.y = rand(-.6, .6); gifts.add(g);
-      const mat = paper[index % paper.length], ribbon = ribbons[index % ribbons.length], round = index % 9 === 0;
+    const place = ({ x, z, w, h, d, rotation, paper: paperIndex, ribbon: ribbonIndex, round }) => {
+      const g = new THREE.Group(); g.position.set(x, h / 2 - .025, z); g.rotation.y = rotation; gifts.add(g);
+      const mat = paper[paperIndex], ribbon = ribbons[ribbonIndex];
       const box = new THREE.Mesh(round ? new THREE.CylinderGeometry(w * .5, w * .5, h, 40) : new RoundedBoxGeometry(w, h, d, 2, .035), mat); g.add(box);
       const lid = new THREE.Mesh(round ? new THREE.CylinderGeometry(w * .525, w * .525, .12, 40) : new RoundedBoxGeometry(w + .05, .12, d + .05, 2, .022), mat); lid.position.y = h / 2 + .025; g.add(lid);
       const band1 = new THREE.Mesh(new THREE.BoxGeometry(w * .14, h + .18, round ? w + .017 : d + .018), ribbon); g.add(band1);
@@ -175,13 +229,7 @@ export class ChristmasTree {
       const knot = new THREE.Mesh(new RoundedBoxGeometry(w * .2, w * .12, w * .16, 2, .035), ribbon); knot.position.set(0, top + w * .045, -.015); knot.rotation.z = .15; g.add(knot);
       return g;
     };
-    // Every azimuth gets its own gift; no front-only rows or tall stacks.
-    for (let i = 0; i < this.giftCount; i++) {
-      const a = TAU * (i + .5) / this.giftCount;
-      const r = (this.mobile ? 3.2 : 3.75) + Math.sin(i * 2.39996) * .09;
-      const w = rand(.48, this.mobile ? .67 : .78), h = rand(.38, .78), d = w * rand(.78, 1.02);
-      place(Math.sin(a) * r, Math.cos(a) * r, w, h, d, i);
-    }
+    layout.forEach(place);
     // Merge the stationary paper and ribbons by material, keeping dozens of gifts inexpensive.
     gifts.updateMatrixWorld(true); const buckets = new Map(), originalGeos = new Set();
     gifts.traverse(o => { if (!o.isMesh) return; let geo = o.geometry.clone(); if (geo.index) { const nonIndexed = geo.toNonIndexed(); geo.dispose(); geo = nonIndexed; } geo.applyMatrix4(o.matrixWorld); originalGeos.add(o.geometry); const key = o.material.uuid; if (!buckets.has(key)) buckets.set(key, { material: o.material, geometries: [] }); buckets.get(key).geometries.push(geo); });
@@ -272,7 +320,7 @@ export class ChristmasTree {
     const width = this.canvas.parentElement.clientWidth, height = this.canvas.parentElement.clientHeight, aspect = width / height;
     if (Math.abs((this.lastAspect || 0) - aspect) > .05) { const distance = Math.max(16.65, (this.sceneWidth || 7.8) / (2 * Math.tan(THREE.MathUtils.degToRad(21)) * aspect)); const direction = this.camera.position.clone().sub(this.controls.target).normalize(); this.camera.position.copy(this.controls.target).addScaledVector(direction, distance); this.controls.minDistance = distance * .7; this.controls.maxDistance = distance * 1.45; this.lastAspect = aspect; }
     this.camera.aspect = aspect; this.camera.updateProjectionMatrix(); this.renderer.setSize(width, height, false); this.composer?.setSize(width, height);
-    for (const m of [this.particleMaterial, this.garlandMaterial, this.starMaterial, this.snowMaterial, this.airMaterial]) if (m?.uniforms.uHeight) m.uniforms.uHeight.value = height;
+    for (const m of [this.particleMaterial, this.garlandMaterial, this.starMaterial, this.snowMaterial, this.airMaterial, this.trailMaterial, this.decorMaterial]) if (m?.uniforms.uHeight) m.uniforms.uHeight.value = height;
     this.closePhoto(true);
   }
 
@@ -282,6 +330,7 @@ export class ChristmasTree {
     this.controls.update(); this.handRotation = (this.handRotation || 0) + ((this.handTarget || 0) - (this.handRotation || 0)) * Math.min(1, dt * 3); this.root.rotation.y = this.handRotation + Math.sin(t * .12) * .045;
     const u = this.particleMaterial.uniforms; u.uTime.value = t; u.uIntro.value = this.state.intro; u.uBurst.value = this.state.burst; u.uFocus.value = this.state.focus;
     this.garlandMaterial.uniforms.uTime.value = t; this.garlandMaterial.uniforms.uIntro.value = this.state.intro; this.starMaterial.uniforms.uTime.value = t; this.starMaterial.uniforms.uIntro.value = this.state.intro; this.snowMaterial.uniforms.uTime.value = t; this.airMaterial.uniforms.uTime.value = t; this.airMaterial.uniforms.uBurst.value = this.state.burst;
+    this.trailMaterial.uniforms.uTime.value = t; this.trailMaterial.uniforms.uIntro.value = this.state.intro; this.trailMaterial.uniforms.uBurst.value = this.state.burst; this.decorMaterial.uniforms.uTime.value = t; this.decorMaterial.uniforms.uIntro.value = this.state.intro;
     this.starGroup.quaternion.copy(this.root.quaternion).invert().multiply(this.camera.quaternion);
     const star = this.starGroup.getWorldPosition(new THREE.Vector3()).project(this.camera); this.callbacks.onStarPosition?.((star.x + 1) * .5 * this.canvas.clientWidth, (1 - star.y) * .5 * this.canvas.clientHeight, star.z < 1);
     this.composer.render();
