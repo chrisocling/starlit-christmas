@@ -103,7 +103,7 @@ export class ChristmasTree {
   }
 
   buildParticles() {
-    const count = this.mobile ? 90000 : 170000;
+    const count = this.mobile ? 130000 : 240000;
     const pos = new Float32Array(count * 3), sizes = new Float32Array(count), kinds = new Float32Array(count), seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const kind = rand(); let x, y, z;
@@ -127,14 +127,16 @@ export class ChristmasTree {
     this.particleMaterial = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uBurst: { value: 0 }, uFocus: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
       vertexShader: `attribute float aSize,aKind,aSeed; uniform float uTime,uIntro,uBurst,uPixel,uHeight; varying float vKind,vTwinkle,vFlow,vVis;
-        void main(){vec3 p=position; vec3 center=vec3(0.,4.2,0.); vec3 outDir=normalize(p-center+vec3(.01));
-        float morph=smoothstep(0.,1.,clamp((uIntro-.38)*1.72,0.,1.));
-        float line=mix(9.9,-.9,morph); vVis=max(step(uIntro,.38),1.-smoothstep(line-.8,line+.8,position.y));
-        float ang=(1.-morph)*3.4; mat2 spin=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
-        p.xz=spin*(p.xz-center.xz)+center.xz;
-        p+=outDir*uBurst*(.7+aSeed*.29); p+=vec3(sin(uTime*.7+aSeed),cos(uTime*.8+aSeed),sin(uTime*.5+aSeed*2.))*.062;
-        p.x+=sin(p.y*.7+uTime*.55)*.085;p.z+=cos(p.y*.6+uTime*.4)*.07;
-        vec3 sphere=center+outDir*(4.3+fract(aSeed*.71)*1.15); p=mix(sphere,p,morph);
+        void main(){vec3 center=vec3(0.,4.2,0.); vec3 outDir=normalize(position-center+vec3(.01));
+        float dly=fract(aSeed*7.31)*.42+(1.-clamp((position.y-.3)/8.4,0.,1.))*.18;
+        float x=clamp((uIntro-.06-dly)/.40,0.,1.); float e=x*x*(3.-2.*x);
+        vVis=smoothstep(0.,.08,x);
+        float ang=(1.-e)*2.6; mat2 spin=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
+        vec3 tp=position; tp.xz=spin*(tp.xz-center.xz)+center.xz;
+        tp+=outDir*uBurst*(.7+aSeed*.29); tp+=vec3(sin(uTime*.7+aSeed),cos(uTime*.8+aSeed),sin(uTime*.5+aSeed*2.))*.04;
+        tp.x+=sin(tp.y*.7+uTime*.55)*.05;tp.z+=cos(tp.y*.6+uTime*.4)*.04;
+        vec3 start=center+outDir*(9.5+fract(aSeed*.53)*5.5); start.y=center.y+(start.y-center.y)*.35+fract(aSeed*.97)*3.2-1.6;
+        vec3 p=mix(start,tp,e); p+=outDir*sin(e*3.14159)*(1.1+fract(aSeed*.37)*1.5);
         vec4 mv=modelViewMatrix*vec4(p,1.);
         vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.45/-mv.z*(1.+uBurst*.8+vFlow*.3),1.,10.)*(.4+.6*vVis);gl_Position=projectionMatrix*mv;}`,
       fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle,vFlow,vVis;
