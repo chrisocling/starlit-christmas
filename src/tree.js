@@ -14,7 +14,7 @@ const TAU = Math.PI * 2;
 let seed = 76391;
 const rand = (lo = 0, hi = 1) => { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; return lo + (seed >>> 0) / 4294967296 * (hi - lo); };
 // A soft canopy envelope; individual branches are clouds, never surfaces.
-function radiusAt(y) { return Math.max(.035, 3.05 * Math.pow(THREE.MathUtils.clamp(1 - (y - .35) / 8.45, 0, 1), .9)); }
+function radiusAt(y) { return Math.max(.035, 2.05 * Math.pow(THREE.MathUtils.clamp(1 - (y - .35) / 8.45, 0, 1), 1.02)); }
 function strip(curve, width, segments = 44) {
   const positions = [], uv = [], indices = [];
   for (let i = 0; i <= segments; i++) { const t = i / segments, p = curve.getPoint(t), tangent = curve.getTangent(t); const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 0, 1)).normalize().multiplyScalar(width / 2); for (const sign of [-1, 1]) { positions.push(p.x + side.x * sign, p.y + side.y * sign, p.z + side.z * sign); uv.push((sign + 1) / 2, t); } if (i < segments) { const a = i * 2; indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
@@ -103,27 +103,24 @@ export class ChristmasTree {
   }
 
   buildParticles() {
-    const count = this.mobile ? 64000 : 132000;
+    const count = this.mobile ? 90000 : 170000;
     const pos = new Float32Array(count * 3), sizes = new Float32Array(count), kinds = new Float32Array(count), seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const kind = rand(); let x, y, z;
-      if (i % 6 === 0) {
-        // Sparse interior light connects the boughs without an opaque trunk.
-        y = rand(.22, 8.65); const angle = rand(0, TAU), r = radiusAt(y) * Math.pow(rand(), .65);
+      if (i % 9 === 0) {
+        y = rand(.22, 8.65); const angle = rand(0, TAU), r = radiusAt(y) * Math.pow(rand(), .7);
         x = Math.cos(angle) * r; z = Math.sin(angle) * r;
       } else {
-        const level = Math.min(9, Math.floor((1 - Math.sqrt(rand())) * 10));
-        const base = .43 + level * .82, reach = radiusAt(base), branches = 16 - level;
-        const angle = Math.floor(rand(0, branches)) / branches * TAU + level * 2.39996;
-        const t = Math.pow(rand(.035, 1), .72), width = (.07 + .22 * (1 - t)) * (.4 + reach * .2);
-        const side = rand(-1, 1) * width, r = reach * t;
-        y = base + (1 - t) * .82 - t * t * .10 + rand(-.07, .09);
-        x = Math.cos(angle) * r - Math.sin(angle) * side;
-        z = Math.sin(angle) * r + Math.cos(angle) * side;
+        // Smooth cone shell of fine dust, denser near the silhouette edge.
+        y = .3 + Math.pow(rand(), .92) * 8.4;
+        const shell = radiusAt(y), r = shell * (rand() < .62 ? .96 + rand() * .08 : Math.pow(rand(), .5) * .92);
+        const angle = rand(0, TAU);
+        x = Math.cos(angle) * r + rand(-.04, .04); z = Math.sin(angle) * r + rand(-.04, .04);
+        y += rand(-.05, .05);
         if (kind >= .70 && kind < .86) y += .065;
       }
       pos.set([x, y, z], i * 3);
-      sizes[i] = kind >= .86 ? rand(.030, .085) : rand(.023, .052);
+      sizes[i] = kind >= .86 ? rand(.010, .026) : rand(.007, .016);
       kinds[i] = kind; seeds[i] = rand(0, TAU);
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1)); geo.setAttribute('aKind', new THREE.BufferAttribute(kinds, 1)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
@@ -139,11 +136,11 @@ export class ChristmasTree {
         p.x+=sin(p.y*.7+uTime*.55)*.085;p.z+=cos(p.y*.6+uTime*.4)*.07;
         vec3 sphere=center+outDir*(4.3+fract(aSeed*.71)*1.15); p=mix(sphere,p,morph);
         vec4 mv=modelViewMatrix*vec4(p,1.);
-        vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.45/-mv.z*(1.+uBurst*.8+vFlow*.3),1.,42.)*(.4+.6*vVis);gl_Position=projectionMatrix*mv;}`,
+        vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.45/-mv.z*(1.+uBurst*.8+vFlow*.3),1.,10.)*(.4+.6*vVis);gl_Position=projectionMatrix*mv;}`,
       fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle,vFlow,vVis;
-        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float alpha=exp(-d*d*10.)*(vKind<.70?.7:.5)*vVis;vec3 c;
+        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float alpha=exp(-d*d*20.)*(vKind<.70?.75:.34)*vVis;vec3 c;
         float t=vKind/.70;
-        if(vKind<.70)c=mix(vec3(.30,.13,.55),vec3(.64,.22,.44),t)*(.85+t*.5);else if(vKind<.86)c=vec3(.8,.74,1.)*.95;else if(vKind<.985)c=vec3(1.,.5,.85)*(2.7+vTwinkle*1.5);else c=vec3(1.,.85,.95)*3.;
+        if(vKind<.70)c=mix(vec3(.34,.15,.58),vec3(.68,.25,.48),t)*(.8+t*.45);else if(vKind<.86)c=vec3(.78,.72,1.)*.8;else if(vKind<.985)c=vec3(1.,.5,.85)*(2.2+vTwinkle*1.3);else c=vec3(1.,.85,.95)*2.6;
         if(vKind>.99){float cross=pow(max(0.,1.-abs(p.x)*24.),5.)+pow(max(0.,1.-abs(p.y)*24.),5.);alpha+=cross*.25;}
         gl_FragColor=vec4(c*vTwinkle*(1.+vFlow*.5)*(1.-uFocus*.3),alpha*uIntro);}`,
       // Alpha blending keeps the colored light points visible over the white snow.
@@ -188,8 +185,8 @@ export class ChristmasTree {
   buildHalo() {
     const count = this.mobile ? 2400 : 4400, pos = [], seeds = [], sizes = [];
     for (let i = 0; i < count; i++) {
-      const a = rand(0, TAU), rr = 3.8 + (rand() + rand() + rand() - 1.5) * .5, y = 4.3 + (rand() + rand() - 1) * 2.0;
-      pos.push(Math.cos(a) * rr, y, Math.sin(a) * rr); seeds.push(rand(0, TAU)); sizes.push(rand(.05, .17));
+      const a = rand(0, TAU), rr = 3.1 + (rand() + rand() + rand() - 1.5) * .5, y = 4.3 + (rand() + rand() - 1) * 2.0;
+      pos.push(Math.cos(a) * rr, y, Math.sin(a) * rr); seeds.push(rand(0, TAU)); sizes.push(rand(.02, .06));
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1)); geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
     this.haloMaterial = new THREE.ShaderMaterial({
@@ -197,10 +194,10 @@ export class ChristmasTree {
       vertexShader: `attribute float aSeed,aSize;uniform float uTime,uHeight,uPixel;varying float vTwinkle,vMix;
         void main(){float a=uTime*.14+aSeed*.02;mat2 rot=mat2(cos(a),-sin(a),sin(a),cos(a));vec3 p=position;p.xz=rot*p.xz;p.y+=sin(uTime*.5+aSeed)*.14;
         vTwinkle=.5+.5*sin(uTime*(.9+fract(aSeed)*.8)+aSeed*5.);vMix=fract(aSeed*.617);
-        vec4 mv=modelViewMatrix*vec4(p,1.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.3/-mv.z,2.,30.);gl_Position=projectionMatrix*mv;}`,
+        vec4 mv=modelViewMatrix*vec4(p,1.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.3/-mv.z,1.,10.);gl_Position=projectionMatrix*mv;}`,
       fragmentShader: `uniform float uIntro;varying float vTwinkle,vMix;void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;
         vec3 c=mix(vec3(.72,.42,1.),vec3(1.,.45,.8),vMix)*(2.2+vTwinkle*1.6);
-        gl_FragColor=vec4(c,exp(-d*d*8.)*(.16+vTwinkle*.22)*uIntro);}`,
+        gl_FragColor=vec4(c,exp(-d*d*10.)*(.05+vTwinkle*.08)*uIntro);}`,
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const halo = new THREE.Points(geo, this.haloMaterial); halo.name = 'Tree halo particles'; halo.frustumCulled = false; this.treeParticles.add(halo);
