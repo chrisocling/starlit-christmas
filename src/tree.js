@@ -111,12 +111,15 @@ export class ChristmasTree {
         y = rand(.22, 8.65); const angle = rand(0, TAU), r = radiusAt(y) * Math.pow(rand(), .7);
         x = Math.cos(angle) * r; z = Math.sin(angle) * r;
       } else {
-        // Smooth cone shell of fine dust, denser near the silhouette edge.
+        // Cone volume with soft edge: radial offset spread around the shell so the
+        // silhouette reads as haze instead of a crisp triangle.
         y = .3 + Math.pow(rand(), .92) * 8.4;
-        const shell = radiusAt(y), r = shell * (rand() < .62 ? .96 + rand() * .08 : Math.pow(rand(), .5) * .92);
+        const shell = radiusAt(y);
+        const gauss = (rand() + rand() + rand() + rand() - 2) / 2;
+        const r = Math.max(.02, shell * (1 + gauss * .38));
         const angle = rand(0, TAU);
-        x = Math.cos(angle) * r + rand(-.04, .04); z = Math.sin(angle) * r + rand(-.04, .04);
-        y += rand(-.05, .05);
+        x = Math.cos(angle) * r + rand(-.05, .05); z = Math.sin(angle) * r + rand(-.05, .05);
+        y += rand(-.12, .12);
         if (kind >= .70 && kind < .86) y += .065;
       }
       pos.set([x, y, z], i * 3);
