@@ -24,14 +24,15 @@ tree = new ChristmasTree($('#tree-canvas'), {
     $('#loading').classList.add('ready');
     // Gesture assets are ~10MB; warm the cache while the intro plays.
     setTimeout(() => { if (graphicsOkay) hand.prefetch(); }, 1200);
-    // Gestures are the main interaction: request the camera once the tree is lit.
-    setTimeout(() => { if (!cameraAutoTried && graphicsOkay && !hand.active && !starting) { cameraAutoTried = true; toggleCamera(); } }, 5200);
+    // Gestures are the main interaction: request the camera once the intro has settled.
+    setTimeout(() => { if (!cameraAutoTried && graphicsOkay && !hand.active && !starting) { cameraAutoTried = true; toggleCamera(); } }, 7600);
   },
   onError() { graphicsOkay = false; $('#loading').hidden = true; $('#graphics-fallback').hidden = false; $('#camera-toggle').disabled = true; $('#try-photo').disabled = true; hand?.stop(); },
   onStarPosition(x, y, visible) { const star = $('#star-control'); star.style.left = `${x}px`; star.style.top = `${y}px`; star.hidden = !visible; },
   onSettings: showSettings,
   onNext: () => nextPhoto(),
 });
+if (import.meta.env.DEV) window.tree = tree;
 
 async function nextPhoto(previous = false) {
   if (!graphicsOkay || album.importing || performance.now() - lastPhoto < 550) return;
