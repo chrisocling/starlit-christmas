@@ -112,6 +112,11 @@ async function toggleMusic() { const button = $('#music-toggle'); button.disable
 $('#music-toggle').addEventListener('click', toggleMusic);
 $('#fullscreen-toggle').addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); else toast('可以用浏览器的全屏功能沉浸观看'); } catch { toast('当前浏览器暂时无法进入全屏'); } });
 document.addEventListener('fullscreenchange', () => { $('#fullscreen-toggle').textContent = document.fullscreenElement ? '退出全屏' : '进入全屏'; });
+$('#share-link').addEventListener('click', async () => {
+  const url = location.origin + location.pathname;
+  try { await navigator.clipboard.writeText(url); toast('分享链接已复制，发给想一起看的人吧'); }
+  catch { toast(`复制失败，链接是 ${url}`, 6000); }
+});
 
 document.addEventListener('keydown', e => {
   if (e.altKey || e.ctrlKey || e.metaKey || e.repeat || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
