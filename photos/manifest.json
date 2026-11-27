@@ -1,1 +1,6 @@
-{"photos":[]}
+{
+  "photos": [
+    { "src": "plane-sleep.jpg", "thumb": "plane-sleep-thumb.jpg", "caption": "睡着的你" },
+    { "src": "night-lights.jpg", "thumb": "night-lights-thumb.jpg", "caption": "一起看灯" }
+  ]
+}
