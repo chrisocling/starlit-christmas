@@ -114,7 +114,7 @@ export class ChristmasTree {
   }
 
   buildParticles() {
-    const count = this.mobile ? 150000 : 290000;
+    const count = this.mobile ? 260000 : 480000;
     const pos = new Float32Array(count * 3), sizes = new Float32Array(count), kinds = new Float32Array(count), seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const kind = rand(); let x, y, z;
@@ -135,32 +135,34 @@ export class ChristmasTree {
         if (kind >= .70 && kind < .86) y += .065;
       }
       pos.set([x, y, z], i * 3);
-      sizes[i] = kind >= .86 ? rand(.010, .026) : rand(.007, .016);
+      sizes[i] = kind >= .86 ? rand(.010, .026) : rand(.006, .014);
       kinds[i] = kind; seeds[i] = rand(0, TAU);
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1)); geo.setAttribute('aKind', new THREE.BufferAttribute(kinds, 1)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
     this.particleMaterial = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uBurst: { value: 0 }, uFocus: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
-      vertexShader: `attribute float aSize,aKind,aSeed; uniform float uTime,uIntro,uBurst,uPixel,uHeight; varying float vKind,vTwinkle,vFlow,vVis,vFly;
+      // The canopy is present from the first frame: a dim, dense column of dust.
+      // The entrance ignites it with a light wave climbing bottom-up instead of
+      // streaming particles in from nowhere. vIgn drives that per-particle swell.
+      vertexShader: `attribute float aSize,aKind,aSeed; uniform float uTime,uIntro,uBurst,uPixel,uHeight; varying float vKind,vTwinkle,vFlow,vVis,vIgn;
         void main(){vec3 center=vec3(0.,4.2,0.); vec3 outDir=normalize(position-center+vec3(.01));
-        float dly=fract(aSeed*7.31)*.42+(1.-clamp((position.y-.3)/8.4,0.,1.))*.18;
-        float x=clamp((uIntro-.06-dly)/.40,0.,1.); float e=x*x*(3.-2.*x);
-        vVis=smoothstep(0.,.08,x);
-        float ang=(1.-e)*2.6; mat2 spin=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
-        vec3 tp=position; tp.xz=spin*(tp.xz-center.xz)+center.xz;
-        tp+=outDir*uBurst*(.7+aSeed*.29); tp+=vec3(sin(uTime*.7+aSeed),cos(uTime*.8+aSeed),sin(uTime*.5+aSeed*2.))*.04;
-        tp.x+=sin(tp.y*.7+uTime*.55)*.05;tp.z+=cos(tp.y*.6+uTime*.4)*.04;
-        vec3 start=center+outDir*(9.5+fract(aSeed*.53)*5.5); start.y=center.y+(start.y-center.y)*.35+fract(aSeed*.97)*3.2-1.6;
-        vec3 p=mix(start,tp,e); p+=outDir*sin(e*3.14159)*(1.1+fract(aSeed*.37)*1.5);
+        float dly=fract(aSeed*7.31)*.26+(1.-clamp((position.y-.3)/8.4,0.,1.))*.30;
+        float x=clamp((uIntro-.03-dly)/.36,0.,1.); float e=x*x*(3.-2.*x); float wave=sin(x*3.14159);
+        vVis=.6+.4*e; vIgn=e;
+        float ang=(1.-e)*.22; mat2 spin=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
+        vec3 p=position; p.xz=spin*(p.xz-center.xz)+center.xz;
+        p+=outDir*uBurst*(.7+aSeed*.29); p+=vec3(sin(uTime*.7+aSeed),cos(uTime*.8+aSeed),sin(uTime*.5+aSeed*2.))*.04;
+        p.x+=sin(p.y*.7+uTime*.55)*.05;p.z+=cos(p.y*.6+uTime*.4)*.04;
         vec4 mv=modelViewMatrix*vec4(p,1.);
-        vFly=e;vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.45/-mv.z*(1.+uBurst*.8+vFlow*.3+(1.-vFly)*1.1),1.,14.)*(.4+.6*vVis)*(1.+(1.-vFly)*1.15);gl_Position=projectionMatrix*mv;}`,
-      fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle,vFlow,vVis,vFly;
-        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;float flying=1.-vFly;float alpha=exp(-d*d*20.)*(vKind<.70?.5:.3)*vVis*(1.+flying*.55);vec3 c;
+        vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.5/-mv.z*(1.+uBurst*.8+vFlow*.3+wave*.85)*(.9+.1*e),1.,16.);gl_Position=projectionMatrix*mv;}`,
+      fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle,vFlow,vVis,vIgn;
+        void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;
+        float wave=sin(vIgn*3.14159);float core=exp(-d*d*38.),halo=exp(-d*d*9.);
+        float alpha=(core*.84+halo*.16)*(vKind<.70?.42:.27)*vVis*(1.+wave*.5);vec3 c;
         float t=vKind/.70;
-        if(vKind<.70)c=mix(vec3(.30,.08,.38),vec3(.62,.16,.40),t)*(.8+t*.45);else if(vKind<.86)c=vec3(.66,.55,.9)*.55;else if(vKind<.985)c=vec3(1.,.5,.85)*(1.6+vTwinkle*1.1);else c=vec3(1.,.85,.95)*2.2;
-        if(vKind>.99){float cross=pow(max(0.,1.-abs(p.x)*24.),5.)+pow(max(0.,1.-abs(p.y)*24.),5.);alpha+=cross*.25;}
-        c=mix(c,vec3(1.,.84,.96),flying*.32);
-        gl_FragColor=vec4(c*vTwinkle*(1.+vFlow*.5)*(1.+flying*.55)*(1.-uFocus*.3),alpha*uIntro);}`,
+        if(vKind<.70)c=mix(vec3(.22,.045,.30),vec3(.52,.11,.35),t)*(.95+t*.45);else if(vKind<.86)c=vec3(.56,.44,.84)*.44;else if(vKind<.985)c=vec3(1.,.48,.84)*(1.7+vTwinkle);else c=vec3(1.,.88,.96)*2.2;
+        if(vKind>.99){float cross=pow(max(0.,1.-abs(p.x)*24.),5.)+pow(max(0.,1.-abs(p.y)*24.),5.);alpha+=cross*.22;}
+        gl_FragColor=vec4(c*vTwinkle*(1.+vFlow*.5)*(1.-uFocus*.3),alpha*(.9+.1*uIntro));}`,
       // Alpha blending keeps the colored light points visible over the white snow.
       transparent: true, blending: THREE.NormalBlending, depthWrite: false,
     });
@@ -349,7 +351,7 @@ export class ChristmasTree {
     const ribbons = ['#d9b86d', '#ece5d4', '#aa193a'].map((color, i) => new THREE.MeshStandardMaterial({ color, metalness: i === 1 ? .15 : .58, roughness: .3, side: THREE.DoubleSide }));
     this.giftMaterials = [...paper, ...ribbons];
     for (const m of this.giftMaterials) { m.transparent = true; m.opacity = 0; }
-    const gifts = new THREE.Group(); gifts.name = 'Gifts around the tree'; this.scene.add(gifts); const layout = createGiftLayout({ mobile: this.mobile }); gifts.userData.layout = layout; this.giftCount = layout.length; this.sceneWidth = this.mobile ? 9.6 : 10.2;
+    const gifts = new THREE.Group(); gifts.name = 'Gifts around the tree'; this.scene.add(gifts); this.giftGroup = gifts; const layout = createGiftLayout({ mobile: this.mobile }); gifts.userData.layout = layout; this.giftCount = layout.length; this.sceneWidth = this.mobile ? 9.6 : 10.2;
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
     const place = ({ x, z, w, h, d, rotation, paper: paperIndex, ribbon: ribbonIndex, round }) => {
       const g = new THREE.Group(); g.position.set(x, h / 2 - .025, z); g.rotation.y = rotation; gifts.add(g);
@@ -370,7 +372,7 @@ export class ChristmasTree {
     // Merge the stationary paper and ribbons by material, keeping dozens of gifts inexpensive.
     gifts.updateMatrixWorld(true); const buckets = new Map(), originalGeos = new Set();
     gifts.traverse(o => { if (!o.isMesh) return; let geo = o.geometry.clone(); if (geo.index) { const nonIndexed = geo.toNonIndexed(); geo.dispose(); geo = nonIndexed; } geo.applyMatrix4(o.matrixWorld); originalGeos.add(o.geometry); const key = o.material.uuid; if (!buckets.has(key)) buckets.set(key, { material: o.material, geometries: [] }); buckets.get(key).geometries.push(geo); });
-    gifts.clear(); for (const { material, geometries } of buckets.values()) { const merged = mergeGeometries(geometries); const mesh = new THREE.Mesh(merged, material); mesh.castShadow = true; mesh.receiveShadow = true; gifts.add(mesh); geometries.forEach(g => g.dispose()); } originalGeos.forEach(g => g.dispose());
+    gifts.clear(); for (const { material, geometries } of buckets.values()) { const merged = mergeGeometries(geometries); const mesh = new THREE.Mesh(merged, material); mesh.castShadow = false; mesh.receiveShadow = true; gifts.add(mesh); geometries.forEach(g => g.dispose()); } originalGeos.forEach(g => g.dispose());
   }
 
   buildWeather() {
@@ -484,6 +486,11 @@ export class ChristmasTree {
       this.ignition.scale.setScalar(.35 + igp * 1.9 + lockGlow * 1.1);
       this.shockMaterial.uniforms.uIntro.value = intro;
       const giftFade = THREE.MathUtils.smoothstep(intro, .34, .88);
+      // Fade gifts in without their shadow map leaking in early (a shadow with
+      // no visible gift reads as a hole in the ground).
+      this.giftGroup.visible = intro > .28;
+      const giftShadows = giftFade > .5;
+      if (giftShadows !== this.giftShadows) { this.giftShadows = giftShadows; for (const mesh of this.giftGroup.children) mesh.castShadow = giftShadows; }
       for (const m of this.giftMaterials) m.opacity = giftFade;
       // Bloom swells while dust streams in, then pops as the tree locks.
       const flying = intro < 1 ? Math.sin(Math.PI * Math.min(1, intro / .92)) : 0;
