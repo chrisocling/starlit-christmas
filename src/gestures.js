@@ -102,10 +102,11 @@ export class HandMagic {
       const {model:modelUrl,loader:loaderUrl,wasm:wasmUrl}=await this.assets();
       if(run!==this.generation)return false;
       const parts={};
+      let firstRun=false;try{firstRun=!localStorage.getItem('xmasGestureReady');}catch{}
       const report=label=>(got,total)=>{
         parts[label]={got,total:total||0};
         let g=0,t=0;for(const k in parts){g+=parts[k].got;t+=parts[k].total;}
-        this.onStatus('loading','正在下载手势识别… '+(t?Math.min(99,Math.round(g/t*100)):0)+'%');
+        this.onStatus('loading','正在下载手势识别… '+(t?Math.min(99,Math.round(g/t*100)):0)+'%'+(firstRun?'（首次约 10MB，之后秒开）':''));
       };
       let model,loader,wasm;
       try{[model,loader,wasm]=await Promise.all([getAsset(modelUrl,report('model')),getAsset(loaderUrl,report('engine')),getAsset(wasmUrl,report('wasm'))]);}
@@ -125,6 +126,7 @@ export class HandMagic {
         catch{options.baseOptions.delegate='CPU';detector=await withTimeout(HandLandmarker.createFromOptions(fileset,options),30000,'手势识别启动超时，请重试');}
       }finally{URL.revokeObjectURL(loaderUrlBlob);URL.revokeObjectURL(wasmUrlBlob);}
       if(run!==this.generation){detector.close();return false;}
+      try{localStorage.setItem('xmasGestureReady','1');}catch{}
       this.detector=detector;this.active=true;this.lastTime=-1;this.lastDetection=0;this.noHandSince=0;
       this.connections=HandLandmarker.HAND_CONNECTIONS;
       this.stream.getVideoTracks().forEach(track=>track.addEventListener('ended',()=>{if(this.active){this.stop();this.onError(new Error('摄像头已断开，可以重新开启'));}}));
