@@ -33,10 +33,64 @@ export class GestureStabilizer {
   reset(){this.candidate=null;this.last=null;this.changed=-Infinity;this.absentSince=null;}
 }
 
+// Model + wasm are ~10MB; on slow networks GitHub Pages takes minutes, so cache
+// them in CacheStorage and show byte-level progress instead of a silent wait.
+const ASSET_CACHE='xmas-gesture-v1';
+const SIMD_TEST=new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11]);
+const inflight=new Map();
+async function simdSupported(){try{await WebAssembly.instantiate(SIMD_TEST);return true;}catch{return false;}}
+function assetType(url){return url.endsWith('.wasm')?'application/wasm':url.endsWith('.js')?'text/javascript':'application/octet-stream';}
+async function readCached(url){
+  if(!('caches' in window))return null;
+  try{const cache=await caches.open(ASSET_CACHE);const hit=await cache.match(url);return hit?new Uint8Array(await hit.arrayBuffer()):null;}catch{return null;}
+}
+function writeCached(url,bytes){
+  if(!('caches' in window))return;
+  caches.open(ASSET_CACHE).then(cache=>cache.put(url,new Response(bytes,{headers:{'content-type':assetType(url)}}))).catch(()=>{});
+}
+function getAsset(url,onProgress){
+  let entry=inflight.get(url);
+  if(!entry){
+    entry={progress:null,bytes:null};
+    entry.promise=(async()=>{
+      const cached=await readCached(url);
+      if(cached){entry.bytes=cached;entry.progress?.(cached.length,cached.length);return cached;}
+      const res=await fetch(url);
+      if(!res.ok)throw new Error('下载失败');
+      const total=Number(res.headers.get('content-length'))||0;
+      let bytes;
+      if(res.body){
+        const reader=res.body.getReader(),chunks=[];let got=0;
+        for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);got+=value.length;entry.progress?.(got,total);}
+        bytes=new Uint8Array(got);let off=0;for(const c of chunks){bytes.set(c,off);off+=c.length;}
+      }else bytes=new Uint8Array(await res.arrayBuffer());
+      entry.bytes=bytes;entry.progress?.(bytes.length,total||bytes.length);
+      writeCached(url,bytes);
+      return bytes;
+    })();
+    entry.promise.catch(()=>inflight.delete(url));
+    inflight.set(url,entry);
+  }
+  if(onProgress){entry.progress=onProgress;if(entry.bytes)onProgress(entry.bytes.length,entry.bytes.length);}
+  return entry.promise;
+}
+
 export class HandMagic {
   constructor({video,overlay,onMode,onRotation,onStatus,onError}){
     Object.assign(this,{video,overlay,onMode,onRotation,onStatus,onError});
-    this.stabilizer=new GestureStabilizer({hold:200,cooldown:1000});this.active=false;this.generation=0;
+    this.stabilizer=new GestureStabilizer({hold:200,cooldown:1000});this.active=false;this.generation=0;this.prefetched=false;
+  }
+  assets(){
+    const base=new URL(import.meta.env.BASE_URL,document.baseURI);
+    return simdSupported().then(simd=>{
+      const variant=simd?'wasm_internal':'wasm_nosimd_internal';
+      return {model:new URL('models/hand_landmarker.task',base).href,loader:new URL(`vendor/wasm/vision_${variant}.js`,base).href,wasm:new URL(`vendor/wasm/vision_${variant}.wasm`,base).href};
+    });
+  }
+  prefetch(){
+    if(this.prefetched||navigator.connection?.saveData)return;
+    this.prefetched=true;
+    this.assets().then(({model,loader,wasm})=>[model,loader,wasm].forEach(url=>getAsset(url).catch(()=>{}))).catch(()=>{});
   }
   async start(){
     const run=++this.generation;
@@ -45,25 +99,31 @@ export class HandMagic {
       this.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:480},height:{ideal:360},frameRate:{ideal:20,max:24}}});
       if(run!==this.generation){this.stream.getTracks().forEach(t=>t.stop());return false;}
       this.video.srcObject=this.stream;await this.video.play();
-      const base=new URL(import.meta.env.BASE_URL,document.baseURI);
-      const modelUrl=new URL('models/hand_landmarker.task',base).href;
-      this.onStatus('loading','正在下载手势模型…');
-      let model;
-      try{
-        const res=await fetch(modelUrl);
-        if(!res.ok)throw new Error('模型下载失败');
-        const total=Number(res.headers.get('content-length'))||0,reader=res.body.getReader(),chunks=[];let got=0;
-        for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);got+=value.length;if(total)this.onStatus('loading','正在下载手势模型… '+Math.min(99,Math.round(got/total*100))+'%');}
-        model=new Uint8Array(got);let off=0;for(const c of chunks){model.set(c,off);off+=c.length;}
-      }catch(error){this.stop();throw new Error('手势模型下载失败，请检查网络后重试');}
+      const {model:modelUrl,loader:loaderUrl,wasm:wasmUrl}=await this.assets();
+      if(run!==this.generation)return false;
+      const parts={};
+      const report=label=>(got,total)=>{
+        parts[label]={got,total:total||0};
+        let g=0,t=0;for(const k in parts){g+=parts[k].got;t+=parts[k].total;}
+        this.onStatus('loading','正在下载手势识别… '+(t?Math.min(99,Math.round(g/t*100)):0)+'%');
+      };
+      let model,loader,wasm;
+      try{[model,loader,wasm]=await Promise.all([getAsset(modelUrl,report('model')),getAsset(loaderUrl,report('engine')),getAsset(wasmUrl,report('wasm'))]);}
+      catch(error){this.stop();throw new Error('手势识别文件下载失败，请检查网络后重试');}
       if(run!==this.generation)return false;
       this.onStatus('loading','正在准备手势识别…');
       const withTimeout=(promise,ms,message)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms))]);
-      const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');
-      const fileset=await withTimeout(FilesetResolver.forVisionTasks(new URL('vendor/wasm',base).href),25000,'手势识别加载超时，请重试');
+      const {HandLandmarker}=await import('@mediapipe/tasks-vision');
+      // Blob URLs let the wasm engine use our cached bytes, so a reload never re-downloads.
+      const loaderUrlBlob=URL.createObjectURL(new Blob([loader],{type:'text/javascript'}));
+      const wasmUrlBlob=URL.createObjectURL(new Blob([wasm],{type:'application/wasm'}));
+      const fileset={wasmLoaderPath:loaderUrlBlob,wasmBinaryPath:wasmUrlBlob};
       const options={baseOptions:{modelAssetBuffer:model,delegate:'GPU'},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.6,minHandPresenceConfidence:.6,minTrackingConfidence:.6};
       let detector;
-      try{detector=await withTimeout(HandLandmarker.createFromOptions(fileset,options),30000,'手势识别启动超时，请重试');}catch{options.baseOptions.delegate='CPU';detector=await withTimeout(HandLandmarker.createFromOptions(fileset,options),30000,'手势识别启动超时，请重试');}
+      try{
+        try{detector=await withTimeout(HandLandmarker.createFromOptions(fileset,options),30000,'手势识别启动超时，请重试');}
+        catch{options.baseOptions.delegate='CPU';detector=await withTimeout(HandLandmarker.createFromOptions(fileset,options),30000,'手势识别启动超时，请重试');}
+      }finally{URL.revokeObjectURL(loaderUrlBlob);URL.revokeObjectURL(wasmUrlBlob);}
       if(run!==this.generation){detector.close();return false;}
       this.detector=detector;this.active=true;this.lastTime=-1;this.lastDetection=0;this.noHandSince=0;
       this.connections=HandLandmarker.HAND_CONNECTIONS;

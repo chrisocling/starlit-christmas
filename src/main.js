@@ -22,6 +22,8 @@ const album = new PhotoAlbum(photos => {
 tree = new ChristmasTree($('#tree-canvas'), {
   onReady() {
     $('#loading').classList.add('ready');
+    // Gesture assets are ~10MB; warm the cache while the intro plays.
+    setTimeout(() => { if (graphicsOkay) hand.prefetch(); }, 1200);
     // Gestures are the main interaction: request the camera once the tree is lit.
     setTimeout(() => { if (!cameraAutoTried && graphicsOkay && !hand.active && !starting) { cameraAutoTried = true; toggleCamera(); } }, 5200);
   },
