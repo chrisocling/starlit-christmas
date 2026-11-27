@@ -20,17 +20,16 @@ function strip(curve, width, segments = 44) {
   for (let i = 0; i <= segments; i++) { const t = i / segments, p = curve.getPoint(t), tangent = curve.getTangent(t); const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 0, 1)).normalize().multiplyScalar(width / 2); for (const sign of [-1, 1]) { positions.push(p.x + side.x * sign, p.y + side.y * sign, p.z + side.z * sign); uv.push((sign + 1) / 2, t); } if (i < segments) { const a = i * 2; indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(indices); geo.computeVertexNormals(); return geo;
 }
-function glowTexture(cross = false) {
+function glowTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
   g.addColorStop(0, '#fff'); g.addColorStop(.08, '#fffffff0'); g.addColorStop(.24, '#ffffff50'); g.addColorStop(1, '#ffffff00'); x.fillStyle = g; x.fillRect(0, 0, 128, 128);
-  if (cross) { x.strokeStyle = '#fff9'; x.lineWidth = 1; x.beginPath(); x.moveTo(64, 0); x.lineTo(64, 128); x.moveTo(0, 64); x.lineTo(128, 64); x.stroke(); }
   return new THREE.CanvasTexture(c);
 }
 
 export class ChristmasTree {
   constructor(canvas, callbacks = {}) {
     this.canvas = canvas; this.callbacks = callbacks; this.mobile = innerWidth < 700; this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.state = { intro: 0, burst: 0, focus: 0, flash: 0 }; this.lastTime = 0; this.albumGeneration = 0; this.photoGeneration = 0;
+    this.state = { intro: 0, burst: 0, focus: 0 }; this.lastTime = 0; this.albumGeneration = 0; this.photoGeneration = 0;
     try {
       this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
       this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.mobile ? 1.35 : 1.6));
@@ -47,8 +46,8 @@ export class ChristmasTree {
       const rim = new THREE.DirectionalLight('#8cadf3', .75); rim.position.set(5, 7, -5); this.scene.add(rim);
       const warm = new THREE.PointLight('#ffb955', 6, 12, 2); warm.position.set(0, 3.5, 3); this.scene.add(warm);
       this.root = new THREE.Group(); this.scene.add(this.root); this.treeParticles = new THREE.Group(); this.treeParticles.name = 'ChristmasTreeParticles'; this.root.add(this.treeParticles); this.photoOrnaments = new THREE.Group(); this.root.add(this.photoOrnaments);
-      this.buildSkyStars(); this.buildSnowfield(); this.buildParticles(); this.buildGroundGlow(); this.buildGarlands(); this.buildStar(); this.buildIgnition(); this.buildHalo(); this.buildFireworks(); this.buildLightTrails(); this.buildGifts(); this.buildWeather(); this.buildSpaceDecorations();
-      this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera)); this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .5, .5, 2.6); this.composer.addPass(this.bloom); this.composer.addPass(new OutputPass());
+      this.buildSkyStars(); this.buildSnowfield(); this.buildParticles(); this.buildGroundGlow(); this.buildGarlands(); this.buildStar(); this.buildHalo(); this.buildFireworks(); this.buildLightTrails(); this.buildGifts(); this.buildWeather(); this.buildSpaceDecorations();
+      this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera)); this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .42, .45, 2.8); this.composer.addPass(this.bloom); this.composer.addPass(new OutputPass());
       this.resizeObserver = new ResizeObserver(() => this.resize()); this.resizeObserver.observe(canvas.parentElement); this.resize();
       // Keynote-style entrance: a slow arc around the tree while the camera pushes in.
       this.homePos = this.camera.position.clone();
@@ -114,7 +113,7 @@ export class ChristmasTree {
   }
 
   buildParticles() {
-    const count = this.mobile ? 260000 : 480000;
+    const count = this.mobile ? 420000 : 760000;
     const pos = new Float32Array(count * 3), sizes = new Float32Array(count), kinds = new Float32Array(count), seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const kind = rand(); let x, y, z;
@@ -135,32 +134,31 @@ export class ChristmasTree {
         if (kind >= .70 && kind < .86) y += .065;
       }
       pos.set([x, y, z], i * 3);
-      sizes[i] = kind >= .86 ? rand(.010, .026) : rand(.006, .014);
+      sizes[i] = kind >= .86 ? rand(.012, .030) : rand(.007, .016);
       kinds[i] = kind; seeds[i] = rand(0, TAU);
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1)); geo.setAttribute('aKind', new THREE.BufferAttribute(kinds, 1)); geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
     this.particleMaterial = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uBurst: { value: 0 }, uFocus: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
       // The canopy is present from the first frame: a dim, dense column of dust.
-      // The entrance ignites it with a light wave climbing bottom-up instead of
-      // streaming particles in from nowhere. vIgn drives that per-particle swell.
+      // The entrance only brightens it with a light wave climbing bottom-up —
+      // positions never move, so the tree never pops or shuffles.
       vertexShader: `attribute float aSize,aKind,aSeed; uniform float uTime,uIntro,uBurst,uPixel,uHeight; varying float vKind,vTwinkle,vFlow,vVis,vIgn;
         void main(){vec3 center=vec3(0.,4.2,0.); vec3 outDir=normalize(position-center+vec3(.01));
         float dly=fract(aSeed*7.31)*.26+(1.-clamp((position.y-.3)/8.4,0.,1.))*.30;
         float x=clamp((uIntro-.03-dly)/.36,0.,1.); float e=x*x*(3.-2.*x); float wave=sin(x*3.14159);
         vVis=.6+.4*e; vIgn=e;
-        float ang=(1.-e)*.22; mat2 spin=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
-        vec3 p=position; p.xz=spin*(p.xz-center.xz)+center.xz;
+        vec3 p=position;
         p+=outDir*uBurst*(.7+aSeed*.29); p+=vec3(sin(uTime*.7+aSeed),cos(uTime*.8+aSeed),sin(uTime*.5+aSeed*2.))*.04;
         p.x+=sin(p.y*.7+uTime*.55)*.05;p.z+=cos(p.y*.6+uTime*.4)*.04;
         vec4 mv=modelViewMatrix*vec4(p,1.);
-        vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.5/-mv.z*(1.+uBurst*.8+vFlow*.3+wave*.85)*(.9+.1*e),1.,16.);gl_Position=projectionMatrix*mv;}`,
+        vKind=aKind;vFlow=pow(.5+.5*sin(p.y*1.55-uTime*1.6+aSeed*.25),6.);vTwinkle=.72+.28*sin(uTime*(1.3+aSeed*.5)+aSeed*9.);gl_PointSize=clamp(aSize*uPixel*uHeight*1.6/-mv.z*(1.+uBurst*.8+vFlow*.3+wave*.85)*(.9+.1*e),1.,18.);gl_Position=projectionMatrix*mv;}`,
       fragmentShader: `uniform float uIntro,uFocus;varying float vKind,vTwinkle,vFlow,vVis,vIgn;
         void main(){vec2 p=gl_PointCoord-.5;float d=length(p);if(d>.5)discard;
-        float wave=sin(vIgn*3.14159);float core=exp(-d*d*38.),halo=exp(-d*d*9.);
-        float alpha=(core*.84+halo*.16)*(vKind<.70?.42:.27)*vVis*(1.+wave*.5);vec3 c;
+        float wave=sin(vIgn*3.14159);float core=exp(-d*d*42.),halo=exp(-d*d*12.);
+        float alpha=(core*.88+halo*.12)*(vKind<.70?.44:.27)*vVis*(1.+wave*.5);vec3 c;
         float t=vKind/.70;
-        if(vKind<.70)c=mix(vec3(.22,.045,.30),vec3(.52,.11,.35),t)*(.95+t*.45);else if(vKind<.86)c=vec3(.56,.44,.84)*.44;else if(vKind<.985)c=vec3(1.,.48,.84)*(1.7+vTwinkle);else c=vec3(1.,.88,.96)*2.2;
+        if(vKind<.70)c=mix(vec3(.17,.03,.25),vec3(.40,.075,.27),t)*(.9+t*.4);else if(vKind<.86)c=vec3(.42,.30,.66)*.36;else if(vKind<.985)c=vec3(1.,.42,.80)*(1.5+vTwinkle);else c=vec3(1.,.86,.94)*2.;
         if(vKind>.99){float cross=pow(max(0.,1.-abs(p.x)*24.),5.)+pow(max(0.,1.-abs(p.y)*24.),5.);alpha+=cross*.22;}
         gl_FragColor=vec4(c*vTwinkle*(1.+vFlow*.5)*(1.-uFocus*.3),alpha*(.9+.1*uIntro));}`,
       // Alpha blending keeps the colored light points visible over the white snow.
@@ -171,15 +169,15 @@ export class ChristmasTree {
 
   buildGarlands() {
     // Widely spaced spiral rings of bright beads — reads as stacked layers.
-    const positions = [], along = [];
-    for (let i = 0; i <= 2600; i++) {
-      const t = i / 2600, y = .6 + t * 8.0, a = t * TAU * 5.5, r = radiusAt(y) * 1.06 + .035;
-      positions.push(Math.cos(a) * r + rand(-.016, .016), y + rand(-.016, .016), Math.sin(a) * r + rand(-.016, .016)); along.push(t);
+    const count = this.mobile ? 9000 : 15000, positions = [], along = [];
+    for (let i = 0; i <= count; i++) {
+      const t = i / count, y = .6 + t * 8.0, a = t * TAU * 5.5, r = radiusAt(y) * 1.06 + .035;
+      positions.push(Math.cos(a) * r + rand(-.014, .014), y + rand(-.014, .014), Math.sin(a) * r + rand(-.014, .014)); along.push(t);
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('aAlong', new THREE.Float32BufferAttribute(along, 1));
     this.garlandMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uHeight: { value: innerHeight }, uPixel: { value: this.renderer.getPixelRatio() } },
-      vertexShader: `attribute float aAlong;uniform float uTime,uHeight,uPixel;varying float vLight,vAlong;void main(){vLight=pow(max(0.,sin(aAlong*74.-uTime*2.2)),12.);vAlong=aAlong;vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp((.016+vLight*.024)*uPixel*uHeight/-p.z,.7,9.);gl_Position=projectionMatrix*p;}`,
-      fragmentShader: `uniform float uIntro;varying float vLight,vAlong;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;vec3 c=mix(vec3(1.,.6,.88),vec3(1.,.9,.75),vLight)*(2.1+vLight*1.8);float on=smoothstep(vAlong*.82,vAlong*.82+.16,uIntro);gl_FragColor=vec4(c,exp(-d*d*16.)*(.7+vLight*.3)*on);}`,
+      vertexShader: `attribute float aAlong;uniform float uTime,uHeight,uPixel;varying float vLight,vAlong;void main(){vLight=pow(max(0.,sin(aAlong*74.-uTime*2.2)),12.);vAlong=aAlong;vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=clamp((.022+vLight*.03)*uPixel*uHeight/-p.z,.8,12.);gl_Position=projectionMatrix*p;}`,
+      fragmentShader: `uniform float uIntro;varying float vLight,vAlong;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;vec3 c=mix(vec3(1.,.6,.88),vec3(1.,.9,.75),vLight)*(2.4+vLight*2.);float on=smoothstep(vAlong*.82,vAlong*.82+.16,uIntro);gl_FragColor=vec4(c,exp(-d*d*22.)*(.75+vLight*.25)*on);}`,
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const garland = new THREE.Points(geo, this.garlandMaterial); garland.name = 'Garland light particles'; this.treeParticles.add(garland);
@@ -201,30 +199,6 @@ export class ChristmasTree {
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     });
     this.starGroup.add(new THREE.Points(geo, this.starMaterial)); this.treeParticles.add(this.starGroup);
-  }
-
-  buildIgnition() {
-    // The opening beat: a single cross-flare light blooms where the star will be,
-    // then a dust shockwave sweeps outward before the canopy streams in.
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(true), color: '#ffd9f2', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
-    sprite.position.set(0, 8.98, 0); sprite.scale.setScalar(.3); this.scene.add(sprite); this.ignition = sprite;
-    const count = this.mobile ? 900 : 1600, pos = [], dir = [], speed = [], sizes = [], seeds = [];
-    for (let i = 0; i < count; i++) {
-      const a = rand(0, TAU), sp = rand(3.2, 7.4);
-      pos.push(0, 8.98, 0); dir.push(Math.cos(a), rand(-.08, .12), Math.sin(a)); speed.push(sp); sizes.push(rand(.018, .05)); seeds.push(rand(0, TAU));
-    }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aDir', new THREE.Float32BufferAttribute(dir, 3)); geo.setAttribute('aSpeed', new THREE.Float32BufferAttribute(speed, 1)); geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1)); geo.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
-    this.shockMaterial = new THREE.ShaderMaterial({
-      uniforms: { uIntro: { value: 0 }, uPixel: { value: this.renderer.getPixelRatio() }, uHeight: { value: innerHeight } },
-      vertexShader: `attribute vec3 aDir;attribute float aSpeed,aSize,aSeed;uniform float uIntro,uHeight,uPixel;varying float vA,vHue;
-        void main(){float k=clamp((uIntro-.012)/.2,0.,1.);float ease=1.-pow(1.-k,3.);float fade=1.-smoothstep(.55,1.,k);
-        vec3 p=position+aDir*aSpeed*ease*1.35;p.y-=ease*ease*1.6;
-        vA=fade*step(.001,uIntro);vHue=fract(aSeed*.371);
-        vec4 mv=modelViewMatrix*vec4(p,1.);gl_PointSize=clamp(aSize*uPixel*uHeight*(1.+ease*.9)/-mv.z,1.,12.);gl_Position=projectionMatrix*mv;}`,
-      fragmentShader: `varying float vA,vHue;void main(){vec2 q=gl_PointCoord-.5;float d=length(q);if(d>.5)discard;float a=exp(-d*d*11.)*vA;if(a<.004)discard;vec3 c=mix(vec3(1.,.86,.97),vec3(.72,.6,1.),step(.45,vHue));gl_FragColor=vec4(c*(2.6+vA*1.6),a*.9);}`,
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const shock = new THREE.Points(geo, this.shockMaterial); shock.name = 'Ignition shockwave'; shock.frustumCulled = false; this.scene.add(shock);
   }
 
   buildHalo() {
@@ -459,7 +433,7 @@ export class ChristmasTree {
     const width = this.canvas.parentElement.clientWidth, height = this.canvas.parentElement.clientHeight, aspect = width / height;
     if (Math.abs((this.lastAspect || 0) - aspect) > .05) { const distance = Math.max(16.65, (this.sceneWidth || 7.8) / (2 * Math.tan(THREE.MathUtils.degToRad(21)) * aspect)); const direction = this.camera.position.clone().sub(this.controls.target).normalize(); this.camera.position.copy(this.controls.target).addScaledVector(direction, distance); this.controls.minDistance = distance * .7; this.controls.maxDistance = distance * 1.45; this.lastAspect = aspect; }
     this.camera.aspect = aspect; this.camera.updateProjectionMatrix(); this.renderer.setSize(width, height, false); this.composer?.setSize(width, height);
-    for (const m of [this.particleMaterial, this.garlandMaterial, this.starMaterial, this.snowMaterial, this.airMaterial, this.trailMaterial, this.decorMaterial, this.skyMaterial, this.glowMaterial, this.shockMaterial]) if (m?.uniforms.uHeight) m.uniforms.uHeight.value = height;
+    for (const m of [this.particleMaterial, this.garlandMaterial, this.starMaterial, this.snowMaterial, this.airMaterial, this.trailMaterial, this.decorMaterial, this.skyMaterial, this.glowMaterial]) if (m?.uniforms.uHeight) m.uniforms.uHeight.value = height;
     this.closePhoto(true);
     if (this.state?.intro >= 1) this.homePos = this.camera.position.clone();
   }
@@ -480,11 +454,6 @@ export class ChristmasTree {
       const u = this.particleMaterial.uniforms; u.uTime.value = t; u.uIntro.value = intro; u.uBurst.value = this.state.burst; u.uFocus.value = this.state.focus;
       const stage = Math.max(0, (intro - .38) / .62);
       this.garlandMaterial.uniforms.uTime.value = t; this.garlandMaterial.uniforms.uIntro.value = stage; this.starMaterial.uniforms.uTime.value = t; this.starMaterial.uniforms.uIntro.value = stage; this.haloMaterial.uniforms.uTime.value = t; this.haloMaterial.uniforms.uIntro.value = stage; this.snowMaterial.uniforms.uTime.value = t; this.airMaterial.uniforms.uTime.value = t; this.airMaterial.uniforms.uBurst.value = this.state.burst;
-      const ig = Math.min(1, intro / .16), igp = Math.sin(ig * Math.PI);
-      const lockGlow = intro < 1 ? Math.exp(-Math.pow((intro - .962) / .028, 2)) : 0;
-      this.ignition.material.opacity = Math.min(1, igp * .95 + lockGlow * .55);
-      this.ignition.scale.setScalar(.35 + igp * 1.9 + lockGlow * 1.1);
-      this.shockMaterial.uniforms.uIntro.value = intro;
       const giftFade = THREE.MathUtils.smoothstep(intro, .34, .88);
       // Fade gifts in without their shadow map leaking in early (a shadow with
       // no visible gift reads as a hole in the ground).
@@ -492,12 +461,8 @@ export class ChristmasTree {
       const giftShadows = giftFade > .5;
       if (giftShadows !== this.giftShadows) { this.giftShadows = giftShadows; for (const mesh of this.giftGroup.children) mesh.castShadow = giftShadows; }
       for (const m of this.giftMaterials) m.opacity = giftFade;
-      // Bloom swells while dust streams in, then pops as the tree locks.
-      const flying = intro < 1 ? Math.sin(Math.PI * Math.min(1, intro / .92)) : 0;
-      this.bloom.strength = .5 + flying * .24 + this.state.flash * .4;
     this.trailMaterial.uniforms.uTime.value = t; this.trailMaterial.uniforms.uIntro.value = intro; this.trailMaterial.uniforms.uBurst.value = this.state.burst; this.decorMaterial.uniforms.uTime.value = t; this.decorMaterial.uniforms.uIntro.value = intro; this.fireworkMaterial.uniforms.uTime.value = t; this.fireworkMaterial.uniforms.uGo.value = Math.max(0, (intro - .92) / .08);
     this.skyMaterial.uniforms.uTime.value = t; this.skyMaterial.uniforms.uIntro.value = intro; this.glowMaterial.uniforms.uTime.value = t; this.glowMaterial.uniforms.uIntro.value = Math.max(0, (intro - .5) / .5);
-    if (intro >= .95 && !this.flashShown) { this.flashShown = true; this.state.flash = 1; animate(this.state, { flash: 0, duration: this.reduced ? 1 : 1600, ease: 'outCubic' }); this.burst(); const f = document.getElementById('flash'); if (f) { f.classList.add('show'); setTimeout(() => f.classList.remove('show'), 160); } }
     if (intro >= 1 && !this.merryShown) { this.merryShown = true; document.getElementById('merry')?.classList.add('show'); }
     this.starGroup.quaternion.copy(this.root.quaternion).invert().multiply(this.camera.quaternion);
     const star = this.starGroup.getWorldPosition(new THREE.Vector3()).project(this.camera); this.callbacks.onStarPosition?.((star.x + 1) * .5 * this.canvas.clientWidth, (1 - star.y) * .5 * this.canvas.clientHeight, star.z < 1);
